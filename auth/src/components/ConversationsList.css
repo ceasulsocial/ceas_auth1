@@ -1,0 +1,124 @@
+.conversations-page {
+  display: flex;
+  height: 80vh;
+  background: #181a1b;
+  border-radius: 16px;
+  box-shadow: 0 2px 16px #000a;
+  overflow: hidden;
+}
+.conversations-list {
+  width: 280px;
+  background: #23272a;
+  color: #fff;
+  padding: 1rem;
+  border-right: 1px solid #222;
+  overflow-y: auto;
+}
+.conversations-list h2 {
+  margin-top: 0;
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
+}
+.conversations-list ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.conversations-list li {
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  background: #23272a;
+  transition: background 0.2s, color 0.2s, transform 0.1s;
+  font-weight: 500;
+}
+.conversations-list li.active, .conversations-list li:hover {
+  background: #2c2f33;
+  color: #00bcd4;
+  transform: scale(1.03);
+}
+.last-message {
+  font-size: 0.9em;
+  color: #aaa;
+  margin-top: 0.2em;
+}
+.messages-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #181a1b;
+  color: #fff;
+  padding: 1.5rem 2rem;
+  position: relative;
+}
+.messages-header {
+  margin-bottom: 1rem;
+  border-bottom: 1px solid #222;
+  padding-bottom: 0.5rem;
+}
+.messages-list {
+  flex: 1;
+  overflow-y: auto;
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.message {
+  background: #23272a;
+  padding: 0.7em 1.1em;
+  border-radius: 12px;
+  max-width: 60%;
+  align-self: flex-start;
+  word-break: break-word;
+  position: relative;
+  font-size: 1rem;
+  box-shadow: 0 1px 4px #0002;
+}
+.message.own {
+  background: #00bcd4;
+  color: #181a1b;
+  align-self: flex-end;
+}
+.msg-meta {
+  font-size: 0.8em;
+  color: #bbb;
+  margin-top: 0.2em;
+  text-align: right;
+}
+.send-message-form {
+  display: flex;
+  gap: 0.5rem;
+  border-top: 1px solid #222;
+  padding-top: 0.7rem;
+}
+.send-message-form input {
+  flex: 1;
+  padding: 0.7em 1em;
+  border-radius: 8px;
+  border: none;
+  background: #23272a;
+  color: #fff;
+  font-size: 1rem;
+}
+.send-message-form button {
+  background: #00bcd4;
+  color: #181a1b;
+  border: none;
+  border-radius: 8px;
+  padding: 0.7em 1.2em;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.send-message-form button:hover {
+  background: #0097a7;
+  color: #fff;
+}
+.no-conversation {
+  color: #aaa;
+  font-size: 1.1rem;
+  margin-top: 2rem;
+  text-align: center;
+}

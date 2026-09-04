@@ -1,0 +1,320 @@
+.home-card .home-actions {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  width: 90%;
+  margin: 1.5rem 0 1.5rem 0;
+  padding: 0 1.5rem;
+}
+.home-card .home-actions button {
+  width: 180px;
+  margin: 0;
+}
+
+.home-card button {
+  width: 180px;
+  margin: 0.3rem 0;
+}
+
+.home-card button:hover {
+  background: #fff;
+  color: #232526;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.18);
+}
+/* RoleSelection options enhanced styling */
+.role-options {
+  display: flex;
+  flex-direction: row;
+  gap: 2rem;
+  margin-bottom: 2rem;
+  justify-content: center;
+}
+
+.role-option {
+  background: #333;
+  color: #f5f5f5;
+  border: none;
+  border-radius: 14px;
+  padding: 2rem 2.5rem;
+  min-width: 180px;
+  min-height: 160px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.13);
+  transition: background 0.22s, color 0.22s, transform 0.22s, box-shadow 0.22s;
+  outline: none;
+  position: relative;
+}
+
+.role-option .role-label {
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.role-option .role-description {
+  color: #bdbdbd;
+  font-size: 1rem;
+  margin-top: 0.5rem;
+  text-align: center;
+}
+
+.role-option.active, .role-option:focus {
+  background: #f5f5f5;
+  color: #232526;
+  transform: scale(1.09);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.22);
+  z-index: 1;
+}
+
+.role-option.user.active {
+  background: #4285f4;
+  color: #fff;
+}
+.role-option.trainer.active {
+  background: #ea4335;
+  color: #fff;
+}
+
+.role-option:hover:not(:disabled):not(.active) {
+  background: #444;
+  transform: scale(1.04);
+}
+
+.role-option:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+
+/* ===== MODERN DARK THEME APP CONTAINER ===== */
+.app {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #232526 0%, #414345 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.app-container {
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+  background: rgba(30, 30, 30, 0.97);
+  border-radius: 18px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.28);
+  overflow: hidden;
+  animation: fadeInApp 0.7s cubic-bezier(0.4,0,0.2,1);
+}
+
+@keyframes fadeInApp {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.app-header {
+  background: linear-gradient(135deg, #232526 0%, #414345 100%);
+  color: #f5f5f5;
+  padding: 2rem 2rem 1.5rem 2rem;
+  text-align: center;
+  border-bottom: 1px solid #444;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 2.1rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.18);
+}
+
+.app-content {
+  padding: 2rem;
+  min-height: 400px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  color: #f5f5f5;
+}
+
+/* Loading screen enhancements */
+
+/* Loading screen enhancements */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  color: #bdbdbd;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #444;
+  border-top: 4px solid #f5f5f5;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Route transition effects */
+
+.route-container {
+  animation: fadeInRoute 0.5s cubic-bezier(0.4,0,0.2,1);
+}
+
+@keyframes fadeInRoute {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Enhanced component styling */
+
+.component-wrapper {
+  background: rgba(30, 30, 30, 0.92);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin: 1rem 0;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.13);
+  border: 1px solid #444;
+  color: #f5f5f5;
+}
+
+/* Responsive design */
+
+@media (max-width: 768px) {
+  .app {
+    padding: 0.5rem;
+  }
+  .app-container {
+    max-width: 100%;
+    margin: 0;
+    border-radius: 0;
+  }
+  .app-header {
+    padding: 1.2rem;
+  }
+  .app-header h1 {
+    font-size: 1.3rem;
+  }
+  .app-content {
+    padding: 1rem;
+  }
+}
+
+
+/* Button Styling - dark theme */
+button, .btn {
+  background: #333;
+  color: #f5f5f5;
+  border: none;
+  padding: 0.875rem 2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.13);
+  position: relative;
+  overflow: hidden;
+  min-width: 120px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+button:hover, .btn:hover {
+  background: #555;
+  transform: translateY(-2px) scale(1.04);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.18);
+}
+
+button:active, .btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.13);
+}
+
+button:focus, .btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px #232526, 0 4px 12px rgba(0,0,0,0.13);
+}
+
+/* Input styling to match buttons */
+
+input[type="text"], input[type="email"], input[type="password"], textarea, select {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  border: 2px solid #444;
+  border-radius: 12px;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  background: #232526;
+  color: #f5f5f5;
+  box-sizing: border-box;
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: #f5f5f5;
+  box-shadow: 0 0 0 3px #232526;
+}
+
+input:hover, textarea:hover, select:hover {
+  border-color: #f5f5f5;
+}
+
+/* Form group styling */
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: #f5f5f5;
+}
+
+/* Debug console styling (for development) */
+
+.debug-info {
+  position: fixed;
+  bottom: 10px;
+  right: 10px;
+  background: #232526;
+  color: #f5f5f5;
+  padding: 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-family: monospace;
+  max-width: 200px;
+  word-wrap: break-word;
+}
