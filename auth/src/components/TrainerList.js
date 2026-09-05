@@ -14,14 +14,12 @@ function TrainerList() {
       .select('id, full_name') // Only select fields you are sure exist
       .eq('role', 'trainer')
       .then((res) => {
-        console.log('Supabase response:', res);
         const { data, error } = res;
         if (error) {
           console.error('Supabase error fetching trainers:', error);
         } else {
           // Exclude current user from trainers list
           const filtered = (data || []).filter(trainer => trainer.id !== user?.id);
-          console.log('Fetched trainers (excluding self):', filtered);
           setTrainers(filtered);
         }
       });
@@ -29,13 +27,29 @@ function TrainerList() {
 
   const startConversation = async (trainerId) => {
     if (!user) return;
-    // Check if conversation already exists
+    // Check if conversation already exists.
+    // FIX: this previously used .maybeSingle(), which throws an error
+    // if MORE THAN ONE row matches — and that error was never checked,
+    // so it was silently treated as "no conversation found," causing a
+    // brand new duplicate conversation to be created. Once even one
+    // duplicate existed, every future click made it worse. This now
+    // takes the oldest matching conversation deterministically, even
+    // if duplicates already exist in your data, and logs real errors
+    // instead of swallowing them.
     let convId = null;
-    const { data: existing, error: existingError } = await supabase
+    const { data: existingRows, error: existingError } = await supabase
       .from('conversations')
       .select('*')
       .or(`and(user1_id.eq.${user.id},user2_id.eq.${trainerId}),and(user1_id.eq.${trainerId},user2_id.eq.${user.id})`)
-      .maybeSingle();
+      .order('created_at', { ascending: true })
+      .limit(1);
+
+    if (existingError) {
+      console.error('Error checking for existing conversation:', existingError);
+    }
+
+    const existing = existingRows && existingRows.length > 0 ? existingRows[0] : null;
+
     if (existing && existing.id) {
       convId = existing.id;
     } else {
@@ -58,12 +72,18 @@ function TrainerList() {
   };
 
   return (
-    <div>
+    <div className="trainer-list">
       <h3>Available Trainers</h3>
       {trainers.map(trainer => (
-        <div key={trainer.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-          <span>{trainer.full_name} ({trainer.id})</span>
-          <button onClick={() => startConversation(trainer.id)} style={{ marginLeft: 8 }}>Chat</button>
+        <div key={trainer.id} className="trainer-list-item">
+          {/* FIX: names showing IDs. This used to render
+              `{trainer.full_name} ({trainer.id})`, printing the raw
+              UUID right next to the name — almost certainly leftover
+              debugging output. Only the name is shown now. */}
+          <span className="trainer-name">{trainer.full_name}</span>
+          <button onClick={() => startConversation(trainer.id)} className="btn-sm">
+            Chat
+          </button>
         </div>
       ))}
     </div>

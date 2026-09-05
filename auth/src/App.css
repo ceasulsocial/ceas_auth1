@@ -1,3 +1,229 @@
+/* ===== MODERN DARK THEME APP CONTAINER ===== */
+.app {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #232526 0%, #414345 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.app-container {
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+  background: rgba(30, 30, 30, 0.97);
+  border-radius: 18px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.28);
+  overflow: hidden;
+  animation: fadeInApp 0.7s cubic-bezier(0.4,0,0.2,1);
+}
+
+/* FIX: CSS too thin — the chat UI gets its own wide layout instead of
+   reusing the 520px auth/home container. Applied conditionally in
+   App.js only on the /conversations route. */
+.app-container--wide {
+  max-width: 1400px;
+  width: 95%;
+  /* FIX: chat window growing with every message. This container
+     previously had no bounded height, only the .app parent's
+     align-items: center, which lets content grow indefinitely instead
+     of clipping. A real height + column flex context here lets
+     .app-content--chat and everything inside it establish a proper
+     bounded box, so only .messages-list scrolls. */
+  height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+@keyframes fadeInApp {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.app-header {
+  background: linear-gradient(135deg, #232526 0%, #414345 100%);
+  color: #f5f5f5;
+  padding: 2rem 2rem 1.5rem 2rem;
+  text-align: center;
+  border-bottom: 1px solid #444;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 2.1rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.18);
+}
+
+.app-content {
+  padding: 2rem;
+  min-height: 400px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  color: #f5f5f5;
+}
+
+/* Chat route needs full-bleed content, not centered/padded like the
+   auth/home screens, so ConversationsList can control its own layout. */
+.app-content--chat {
+  padding: 0;
+  flex: 1;
+  min-height: 0; /* crucial: lets this flex child shrink to fit instead of growing */
+  overflow: hidden;
+  justify-content: stretch;
+}
+
+/* Loading screen enhancements */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  color: #bdbdbd;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #444;
+  border-top: 4px solid #f5f5f5;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Route transition effects */
+.route-container {
+  animation: fadeInRoute 0.5s cubic-bezier(0.4,0,0.2,1);
+  height: 100%;
+}
+
+@keyframes fadeInRoute {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Enhanced component styling */
+.component-wrapper {
+  background: rgba(30, 30, 30, 0.92);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin: 1rem 0;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.13);
+  border: 1px solid #444;
+  color: #f5f5f5;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .app {
+    padding: 0.5rem;
+  }
+  .app-container {
+    max-width: 100%;
+    margin: 0;
+    border-radius: 0;
+  }
+  .app-container--wide {
+    width: 100%;
+  }
+  .app-header {
+    padding: 1.2rem;
+  }
+  .app-header h1 {
+    font-size: 1.3rem;
+  }
+  .app-content {
+    padding: 1rem;
+  }
+}
+
+/* =====================================================================
+   BUTTON SYSTEM (FIX: inconsistent button sizes)
+
+   Previously .home-card button, .role-option, and MessageInput's inline
+   styles each hard-coded their own widths/padding, so different buttons
+   in the app visibly didn't match. This keeps one base look for every
+   button and adds three size modifiers any button/link can opt into:
+   .btn-sm, .btn-md, .btn-lg. Pick one modifier per button instead of
+   setting one-off widths in component CSS or inline styles.
+   ===================================================================== */
+
+button, .btn {
+  background: #333;
+  color: #f5f5f5;
+  border: none;
+  padding: 0.875rem 2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.13);
+  position: relative;
+  overflow: hidden;
+  min-width: 120px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+button:hover, .btn:hover {
+  background: #555;
+  transform: translateY(-2px) scale(1.04);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.18);
+}
+
+button:active, .btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.13);
+}
+
+button:focus, .btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px #232526, 0 4px 12px rgba(0,0,0,0.13);
+}
+
+.btn-sm {
+  min-width: 90px;
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+}
+
+.btn-md {
+  min-width: 140px;
+  padding: 0.875rem 1.5rem;
+}
+
+.btn-lg {
+  min-width: 180px;
+  padding: 1.25rem 2rem;
+}
+
+/* Home screen action buttons: use .btn-md in JSX instead of relying on
+   a fixed width here — this rule now only handles spacing/layout. */
 .home-card .home-actions {
   display: flex;
   flex-direction: row;
@@ -6,14 +232,10 @@
   width: 90%;
   margin: 1.5rem 0 1.5rem 0;
   padding: 0 1.5rem;
-}
-.home-card .home-actions button {
-  width: 180px;
-  margin: 0;
+  gap: 1rem;
 }
 
 .home-card button {
-  width: 180px;
   margin: 0.3rem 0;
 }
 
@@ -22,7 +244,10 @@
   color: #232526;
   box-shadow: 0 8px 25px rgba(0,0,0,0.18);
 }
-/* RoleSelection options enhanced styling */
+
+/* Role selection cards intentionally stay larger/distinct — these are
+   choice cards, not plain action buttons, so they keep their own size
+   rather than using the .btn-* scale. */
 .role-options {
   display: flex;
   flex-direction: row;
@@ -92,182 +317,11 @@
   cursor: not-allowed;
 }
 
-
-/* ===== MODERN DARK THEME APP CONTAINER ===== */
-.app {
-  min-height: 100vh;
-  background: linear-gradient(135deg, #232526 0%, #414345 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-}
-
-.app-container {
-  width: 100%;
-  max-width: 520px;
-  margin: 0 auto;
-  background: rgba(30, 30, 30, 0.97);
-  border-radius: 18px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.28);
-  overflow: hidden;
-  animation: fadeInApp 0.7s cubic-bezier(0.4,0,0.2,1);
-}
-
-@keyframes fadeInApp {
-  from {
-    opacity: 0;
-    transform: translateY(40px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.app-header {
-  background: linear-gradient(135deg, #232526 0%, #414345 100%);
-  color: #f5f5f5;
-  padding: 2rem 2rem 1.5rem 2rem;
-  text-align: center;
-  border-bottom: 1px solid #444;
-}
-
-.app-header h1 {
-  margin: 0;
-  font-size: 2.1rem;
-  font-weight: 700;
-  letter-spacing: 1px;
-  text-shadow: 0 2px 8px rgba(0,0,0,0.18);
-}
-
-.app-content {
-  padding: 2rem;
-  min-height: 400px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  color: #f5f5f5;
-}
-
-/* Loading screen enhancements */
-
-/* Loading screen enhancements */
-.loading-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 300px;
-  color: #bdbdbd;
-}
-
-.loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #444;
-  border-top: 4px solid #f5f5f5;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin-bottom: 1rem;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-/* Route transition effects */
-
-.route-container {
-  animation: fadeInRoute 0.5s cubic-bezier(0.4,0,0.2,1);
-}
-
-@keyframes fadeInRoute {
-  from {
-    opacity: 0;
-    transform: translateX(24px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-/* Enhanced component styling */
-
-.component-wrapper {
-  background: rgba(30, 30, 30, 0.92);
-  border-radius: 12px;
-  padding: 1.5rem;
-  margin: 1rem 0;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.13);
-  border: 1px solid #444;
-  color: #f5f5f5;
-}
-
-/* Responsive design */
-
-@media (max-width: 768px) {
-  .app {
-    padding: 0.5rem;
-  }
-  .app-container {
-    max-width: 100%;
-    margin: 0;
-    border-radius: 0;
-  }
-  .app-header {
-    padding: 1.2rem;
-  }
-  .app-header h1 {
-    font-size: 1.3rem;
-  }
-  .app-content {
-    padding: 1rem;
-  }
-}
-
-
-/* Button Styling - dark theme */
-button, .btn {
-  background: #333;
-  color: #f5f5f5;
-  border: none;
-  padding: 0.875rem 2rem;
-  font-size: 1rem;
-  font-weight: 600;
-  border-radius: 12px;
-  cursor: pointer;
-  transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.13);
-  position: relative;
-  overflow: hidden;
-  min-width: 120px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-}
-
-button:hover, .btn:hover {
-  background: #555;
-  transform: translateY(-2px) scale(1.04);
-  box-shadow: 0 8px 25px rgba(0,0,0,0.18);
-}
-
-button:active, .btn:active {
-  transform: translateY(0);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.13);
-}
-
-button:focus, .btn:focus {
-  outline: none;
-  box-shadow: 0 0 0 3px #232526, 0 4px 12px rgba(0,0,0,0.13);
-}
+/* A small "change role" button (if you have one, e.g. in a settings
+   menu or nav) should use .btn-sm rather than a one-off width, so it
+   lines up with other small actions like the conversation buttons. */
 
 /* Input styling to match buttons */
-
 input[type="text"], input[type="email"], input[type="password"], textarea, select {
   width: 100%;
   padding: 0.875rem 1rem;
@@ -295,7 +349,6 @@ input:hover, textarea:hover, select:hover {
   margin-bottom: 1.5rem;
 }
 
-
 .form-group label {
   display: block;
   margin-bottom: 0.5rem;
@@ -303,8 +356,28 @@ input:hover, textarea:hover, select:hover {
   color: #f5f5f5;
 }
 
-/* Debug console styling (for development) */
+/* Trainer list rows (used by TrainerList.js) */
+.trainer-list {
+  width: 100%;
+}
 
+.trainer-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+  border-radius: 8px;
+  background: #23272a;
+}
+
+.trainer-name {
+  font-weight: 500;
+  color: #f5f5f5;
+}
+
+/* Debug console styling (for development) */
 .debug-info {
   position: fixed;
   bottom: 10px;

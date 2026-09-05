@@ -1,29 +1,206 @@
+.loading {
+  color: #aaa;
+  font-size: 1.1rem;
+  margin-top: 2rem;
+  text-align: center;
+  padding: 2rem;
+}
+
+.error-message {
+  background-color: #ed4245;
+  color: white;
+  padding: 12px 20px;
+  text-align: center;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.error-message button {
+  background: transparent;
+  border: 1px solid white;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  min-width: 0; /* don't inherit the global button min-width here */
+}
+
+.error-message button:hover {
+  background: white;
+  color: #ed4245;
+}
+
+.no-messages {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  color: #99aab5;
+  font-size: 16px;
+}
+
+/* =====================================================================
+   FIX: CSS too thin / messy.
+
+   .conversations-page, .messages-header, .message and .message.own were
+   referenced in the JS (ConversationsList.js, ConversationView.js,
+   MessagesList.js) but never actually defined anywhere in the CSS, so
+   the whole chat layout and every message bubble were rendering with
+   zero custom styling — just browser defaults. Combined with the old
+   520px app-container cap (now bypassed for this route in App.js), this
+   was the main source of the "thin and messy" look.
+   ===================================================================== */
+
 .conversations-page {
   display: flex;
-  height: 80vh;
+  flex-direction: row;
+  width: 100%;
+  height: 100%;
+  min-height: 0; /* required alongside height: 100% so this doesn't grow past its bounded parent */
   background: #181a1b;
-  border-radius: 16px;
-  box-shadow: 0 2px 16px #000a;
-  overflow: hidden;
-}
-.conversations-list {
-  width: 280px;
-  background: #23272a;
   color: #fff;
-  padding: 1rem;
-  border-right: 1px solid #222;
+}
+
+.conversations-list {
+  width: 320px;
+  flex-shrink: 0;
+  padding: 1.5rem 1rem;
+  border-right: 1px solid #2c2f33;
   overflow-y: auto;
 }
+
 .conversations-list h2 {
-  margin-top: 0;
-  font-size: 1.2rem;
-  margin-bottom: 1rem;
+  margin: 0 0 1rem 0;
+  font-size: 1.3rem;
 }
+
 .conversations-list ul {
   list-style: none;
-  padding: 0;
   margin: 0;
+  padding: 0;
 }
+
+.messages-header {
+  padding: 1rem 0 1rem 0;
+  border-bottom: 1px solid #2c2f33;
+  margin-bottom: 1rem;
+}
+
+.messages-header h3 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.no-conversation {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #99aab5;
+  font-size: 1.1rem;
+}
+
+/* Chat bubbles */
+.message {
+  box-sizing: border-box;
+  width: auto;
+  max-width: 65%;
+  padding: 0.75rem 1.1rem;
+  border-radius: 14px;
+  background: #2c2f33;
+  color: #fff;
+  word-wrap: break-word;
+  line-height: 1.4;
+  font-size: 0.98rem;
+}
+
+.message-wrapper {
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+}
+.message-wrapper.own {
+  align-items: flex-end;
+}
+
+.message-wrapper.other {
+  align-items: flex-start;
+}
+
+.message.own {
+  align-self: flex-end;
+  background: #00bcd4;
+  color: #181a1b;
+}
+
+.msg-meta {
+  margin-top: 0.35rem;
+  font-size: 0.72rem;
+  opacity: 0.65;
+  text-align: right;
+}
+
+/* FIX: read receipts. Subtle "Seen" label shown under the last message
+   you sent, once the other person has read it. */
+.msg-seen {
+  color: #00bcd4;
+  font-weight: 600;
+}
+
+/* Fix for message input inside the form */
+.send-message-form {
+  display: flex;
+  gap: 0.5rem;
+  border-top: 1px solid #222;
+  padding-top: 0.7rem;
+  width: 100%;
+}
+
+/* Classes used directly by MessageInput.js */
+.message-input-form {
+  display: flex;
+  gap: 0.5rem;
+  border-top: 1px solid #222;
+  padding-top: 0.7rem;
+  width: 100%;
+}
+
+.message-input-field {
+  flex: 1;
+  padding: 0.7em 1em;
+  border-radius: 8px;
+  border: none;
+  background: #23272a;
+  color: #fff;
+  font-size: 1rem;
+  min-height: 48px;
+}
+
+/* .btn-md (from App.css) already sets sizing; this only sets the
+   send button's distinct color so it still matches other buttons in
+   width/padding while keeping its accent color. */
+.message-input-send {
+  background: #00bcd4;
+  color: #181a1b;
+}
+
+.message-input-send:hover:not(:disabled) {
+  background: #0097a7;
+  color: #fff;
+}
+
+.message-input-send:disabled {
+  background: #40444b;
+  color: #72767d;
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Fix for conversation items in list */
 .conversations-list li {
   padding: 0.75rem 1rem;
   margin-bottom: 0.5rem;
@@ -33,92 +210,62 @@
   transition: background 0.2s, color 0.2s, transform 0.1s;
   font-weight: 500;
 }
-.conversations-list li.active, .conversations-list li:hover {
+
+.conversations-list li.active {
   background: #2c2f33;
   color: #00bcd4;
-  transform: scale(1.03);
 }
-.last-message {
-  font-size: 0.9em;
-  color: #aaa;
-  margin-top: 0.2em;
+
+.conversations-list li:hover {
+  background: #2c2f33;
+  color: #00bcd4;
+  transform: scale(1.02);
 }
+
+/* Fix for messages section */
 .messages-section {
   flex: 1;
+  min-height: 0; /* required so this shrinks instead of growing with content */
   display: flex;
   flex-direction: column;
   background: #181a1b;
   color: #fff;
   padding: 1.5rem 2rem;
   position: relative;
+  overflow: hidden;
 }
-.messages-header {
-  margin-bottom: 1rem;
-  border-bottom: 1px solid #222;
-  padding-bottom: 0.5rem;
-}
+
 .messages-list {
   flex: 1;
   overflow-y: auto;
   margin-bottom: 1rem;
   display: flex;
   flex-direction: column;
+  /* FIX: message bubbles filling the entire width/height.
+     Without this, the default align-items: stretch forces every
+     child (each .message bubble) to fill the full container width,
+     overriding .message's own max-width. align-items: flex-start
+     makes children size to their own content by default, and each
+     .message's align-self then only controls left/right position. */
+  align-items: flex-start;
   gap: 0.5rem;
+  padding: 0.5rem 0;
 }
-.message {
-  background: #23272a;
-  padding: 0.7em 1.1em;
-  border-radius: 12px;
-  max-width: 60%;
-  align-self: flex-start;
-  word-break: break-word;
-  position: relative;
-  font-size: 1rem;
-  box-shadow: 0 1px 4px #0002;
+
+/* Make messages scrollable */
+.messages-list::-webkit-scrollbar {
+  width: 8px;
 }
-.message.own {
-  background: #00bcd4;
-  color: #181a1b;
-  align-self: flex-end;
+
+.messages-list::-webkit-scrollbar-track {
+  background: #181a1b;
 }
-.msg-meta {
-  font-size: 0.8em;
-  color: #bbb;
-  margin-top: 0.2em;
-  text-align: right;
+
+.messages-list::-webkit-scrollbar-thumb {
+  background: #2c2f33;
+  border-radius: 4px;
 }
-.send-message-form {
-  display: flex;
-  gap: 0.5rem;
-  border-top: 1px solid #222;
-  padding-top: 0.7rem;
-}
-.send-message-form input {
-  flex: 1;
-  padding: 0.7em 1em;
-  border-radius: 8px;
-  border: none;
-  background: #23272a;
-  color: #fff;
-  font-size: 1rem;
-}
-.send-message-form button {
-  background: #00bcd4;
-  color: #181a1b;
-  border: none;
-  border-radius: 8px;
-  padding: 0.7em 1.2em;
-  font-weight: bold;
-  cursor: pointer;
-  transition: background 0.2s, color 0.2s;
-}
-.send-message-form button:hover {
-  background: #0097a7;
-  color: #fff;
-}
-.no-conversation {
-  color: #aaa;
-  font-size: 1.1rem;
-  margin-top: 2rem;
-  text-align: center;
+
+.messages-list::-webkit-scrollbar-thumb:hover {
+  background: #40444b;
 }

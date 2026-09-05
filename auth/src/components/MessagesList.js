@@ -1,33 +1,59 @@
 import { useEffect, useRef } from 'react';
+import './ConversationsList.css'; // Import the CSS
 
-export default function MessagesList({ messages, currentUserId }) {
+export default function MessagesList({ messages, currentUserId, conversation }) {
   const endRef = useRef(null);
+
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // FIX: read receipts.
+  // Figures out which read_userX column belongs to the OTHER person in
+  // this conversation, then finds the last message I sent so the
+  // "Seen" indicator only shows once, under the most recent message,
+  // matching typical chat-app UX rather than tagging every message.
+  const isUser1 = conversation && currentUserId === conversation.user1_id;
+  const otherReadColumn = isUser1 ? 'read_user2' : 'read_user1';
+
+  let lastOwnMessageId = null;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].sender_id === currentUserId) {
+      lastOwnMessageId = messages[i].id;
+      break;
+    }
+  }
+
   return (
-    <div style={{ maxHeight: 400, overflowY: 'auto', padding: 10, background: '#23272a', borderRadius: 8 }}>
-      {messages.map(msg => (
-        <div
-          key={msg.id}
-          style={{
-            background: msg.sender_id === currentUserId ? '#00bcd4' : '#181a1b',
-            color: msg.sender_id === currentUserId ? '#181a1b' : '#fff',
-            alignSelf: msg.sender_id === currentUserId ? 'flex-end' : 'flex-start',
-            margin: '8px 0',
-            padding: '8px 14px',
-            borderRadius: 12,
-            maxWidth: '70%',
-            fontSize: 16,
-          }}
-        >
-          {msg.content}
-          <div style={{ fontSize: 12, color: '#bbb', marginTop: 4, textAlign: 'right' }}>
-            {new Date(msg.created_at).toLocaleTimeString()}
+    <>
+      {messages.map((msg) => {
+        const isOwn = msg.sender_id === currentUserId;
+        const showSeen =
+          isOwn &&
+          conversation &&
+          msg.id === lastOwnMessageId &&
+          msg[otherReadColumn];
+
+        return (
+          <div
+            key={msg.id}
+            className={`message ${isOwn ? 'own' : ''}`}
+          >
+            {msg.content}
+            <div className="msg-meta">
+              {new Date(msg.created_at).toLocaleString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                month: 'short',
+                day: 'numeric',
+                hour12: true
+              })}
+              {showSeen && <span className="msg-seen"> · Seen</span>}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
       <div ref={endRef} />
-    </div>
+    </>
   );
 }
