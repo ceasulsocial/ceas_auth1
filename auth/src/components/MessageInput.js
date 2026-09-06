@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
-import './ConversationsList.css'; // Import the CSS
+import MediaUpload from './MediaUpload';
+import './ConversationsList.css';
 
-export default function MessageInput({ onSend }) {
+export default function MessageInput({ onSend, conversationId, currentUserId, onMediaUpload }) {
   const [value, setValue] = useState('');
   const inputRef = useRef(null);
 
@@ -25,30 +26,82 @@ export default function MessageInput({ onSend }) {
     }
   };
 
-  // FIX: inconsistent button sizes.
-  // This used to set width/padding via inline `style={{}}`, which beats
-  // any CSS class due to specificity — so it could never match the
-  // sizing used by other buttons in the app (home actions, role
-  // options). It now uses the shared .btn-md class from App.css/
-  // ConversationsList.css like every other action button.
+  // ✅ This is the onMediaUpload function
+  const handleMediaUpload = () => {
+    console.log('📤 Media upload complete, refreshing messages...');
+    if (onMediaUpload) {
+      // Call multiple times with delays to ensure it triggers
+      setTimeout(onMediaUpload, 100);
+      setTimeout(onMediaUpload, 500);
+      setTimeout(onMediaUpload, 1000);
+    } else {
+      console.warn('⚠️ onMediaUpload prop is not defined');
+    }
+  };
+
   return (
-    <form onSubmit={handleSubmit} className="message-input-form">
-      <input
-        ref={inputRef}
-        type="text"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder="Type a message..."
-        className="message-input-field"
-      />
-      <button
-        type="submit"
-        disabled={!value.trim()}
-        className="btn-md message-input-send"
-      >
-        Send
-      </button>
-    </form>
+    <div style={styles.container}>
+      <form onSubmit={handleSubmit} style={styles.form}>
+        <MediaUpload
+          conversationId={conversationId}
+          currentUserId={currentUserId}
+          onUploadComplete={handleMediaUpload}
+        />
+        <input
+          ref={inputRef}
+          type="text"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Type a message..."
+          style={styles.input}
+        />
+        <button
+          type="submit"
+          disabled={!value.trim()}
+          style={{
+            ...styles.sendButton,
+            background: value.trim() ? '#00bcd4' : '#40444b',
+            color: value.trim() ? '#181a1b' : '#72767d',
+            cursor: value.trim() ? 'pointer' : 'not-allowed',
+          }}
+        >
+          Send
+        </button>
+      </form>
+    </div>
   );
 }
+
+const styles = {
+  container: {
+    width: '100%',
+  },
+  form: {
+    display: 'flex',
+    gap: '8px',
+    alignItems: 'center',
+    padding: '4px 8px',
+    backgroundColor: '#40444b',
+    borderRadius: '8px',
+  },
+  input: {
+    flex: 1,
+    padding: '12px 16px',
+    backgroundColor: 'transparent',
+    border: 'none',
+    color: '#fff',
+    fontSize: '16px',
+    outline: 'none',
+    minHeight: '48px',
+  },
+  sendButton: {
+    border: 'none',
+    borderRadius: '6px',
+    padding: '10px 20px',
+    fontWeight: '600',
+    fontSize: '16px',
+    transition: 'all 0.2s',
+    minWidth: '70px',
+  },
+};

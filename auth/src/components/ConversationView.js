@@ -1,155 +1,105 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import MessagesList from './MessagesList';
 import MessageInput from './MessageInput';
-import './ConversationsList.css';
+import './ConversationsList.css'; // Import the CSS
 
-export default function ConversationView({ conversation, currentUserId, onMessageSent }) {
+export default function ConversationView({ conversation, currentUserId }) {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const messagesEndRef = useRef(null);
+  // Tracks message ids currently being marked as read, so an in-flight
+  // update can't be triggered again before it resolves.
   const markingReadRef = useRef(new Set());
-  const channelRef = useRef(null);
-  const isInitialLoad = useRef(true);
 
-  const scrollToBottomInstant = useCallback(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'instant' });
-    }
-  }, []);
-
-  const fetchMessages = useCallback(async () => {
-    if (!conversation) return;
-    
-    try {
-      console.log('📥 Fetching messages for conversation:', conversation.id);
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('conversation', conversation.id)
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-      console.log('📥 Fetched messages:', data?.length || 0);
-      
-      setMessages(data || []);
-      setError(null);
-      
-      setTimeout(() => {
-        scrollToBottomInstant();
-      }, 50);
-      
-    } catch (err) {
-      console.error('Error fetching messages:', err);
-      setError(`Failed to load messages: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  }, [conversation, scrollToBottomInstant]);
-
-  // Initial fetch and scroll to bottom
   useEffect(() => {
-    if (!conversation) {
-      setMessages([]);
-      return;
-    }
+    if (!conversation) return;
 
-    isInitialLoad.current = true;
+    const fetchInitialMessages = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('messages')
+          .select('*')
+          .eq('conversation', conversation.id)
+          .order('created_at', { ascending: true });
+
+        if (error) throw error;
+        setMessages(data || []);
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching messages:', err);
+        setError(`Failed to load messages: ${err.message}`);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     setLoading(true);
-    fetchMessages();
+    fetchInitialMessages();
 
-    // Clean up old subscription
-    if (channelRef.current) {
-      supabase.removeChannel(channelRef.current);
-      channelRef.current = null;
-    }
-
-    console.log('🔌 Setting up Realtime subscription for conversation:', conversation.id);
-
-    // Create new subscription
+    // FIX: runaway request loop / messages not sending.
+    // This previously listened for event: '*' and called a full
+    // re-fetch of the whole conversation on ANY change. But marking a
+    // message as read (below) is itself an UPDATE to this same table —
+    // which re-triggered the listener — which re-fetched — which
+    // re-ran the read-marking effect — which updated again, and so on.
+    // That loop is what flooded Postgres with tens of thousands of
+    // requests. Each event type is now handled separately, patching
+    // local state directly from the payload instead of re-querying the
+    // whole table, so there's nothing left to loop on.
     const channel = supabase
-      .channel(`messages_${conversation.id}`)
+      .channel('messages_' + conversation.id)
       .on(
         'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `conversation=eq.${conversation.id}`
-        },
+        { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation=eq.${conversation.id}` },
         (payload) => {
-          console.log('🟢 INSERT event received:', payload.new);
-          
-          setMessages(prev => {
-            if (prev.some(m => m.id === payload.new.id)) {
-              return prev;
-            }
-            return [...prev, payload.new];
-          });
-          
-          //  Scroll to bottom instantly on new message
-          setTimeout(() => {
-            scrollToBottomInstant();
-          }, 10);
+          setMessages(prev =>
+            prev.some(m => m.id === payload.new.id) ? prev : [...prev, payload.new]
+          );
         }
       )
       .on(
         'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'messages',
-          filter: `conversation=eq.${conversation.id}`
-        },
+        { event: 'UPDATE', schema: 'public', table: 'messages', filter: `conversation=eq.${conversation.id}` },
         (payload) => {
-          console.log(' UPDATE event received:', payload.new);
-          setMessages(prev => prev.map(m => 
-            m.id === payload.new.id ? payload.new : m
-          ));
+          setMessages(prev => prev.map(m => (m.id === payload.new.id ? payload.new : m)));
           markingReadRef.current.delete(payload.new.id);
         }
       )
       .on(
         'postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'messages',
-          filter: `conversation=eq.${conversation.id}`
-        },
+        { event: 'DELETE', schema: 'public', table: 'messages', filter: `conversation=eq.${conversation.id}` },
         (payload) => {
-          console.log('🔴 DELETE event received:', payload.old);
           setMessages(prev => prev.filter(m => m.id !== payload.old.id));
         }
       )
+      // Diagnostic logging: if received messages still aren't arriving
+      // live, check the browser console for this status. "SUBSCRIBED"
+      // means the channel is healthy and the problem is elsewhere
+      // (most likely Realtime replication not enabled for this table
+      // in Supabase: Database > Replication). "CHANNEL_ERROR" or
+      // "TIMED_OUT" points to an auth/replication problem directly.
       .subscribe((status, err) => {
-        if (err) {
-          console.error('❌ Realtime subscription error:', err);
-        }
-        console.log('📡 Realtime channel status:', status);
+        if (err) console.error('Realtime subscription error:', err);
+        console.log('Realtime channel status:', status);
       });
 
-    channelRef.current = channel;
-
     return () => {
-      if (channelRef.current) {
-        console.log('🧹 Cleaning up channel');
-        supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
-      }
+      supabase.removeChannel(channel);
     };
-  }, [conversation, fetchMessages, scrollToBottomInstant]);
+  }, [conversation?.id]);
 
-  // 🔥 Scroll to bottom instantly whenever messages change
   useEffect(() => {
     if (messages.length > 0) {
-      scrollToBottomInstant();
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-    isInitialLoad.current = false;
-  }, [messages, scrollToBottomInstant]);
+  }, [messages]);
 
-  // Read receipts
+  // Read receipts, using the existing read_user1 / read_user2 columns.
+  // Guarded against re-firing on ids already being marked, so an
+  // UPDATE event can't accidentally trigger a duplicate in-flight
+  // request for the same message.
   useEffect(() => {
     if (!conversation || messages.length === 0) return;
 
@@ -177,76 +127,65 @@ export default function ConversationView({ conversation, currentUserId, onMessag
 
       if (error) {
         console.error('Error marking messages read:', error);
-        unreadIds.forEach((id) => markingReadRef.current.delete(id));
+        unreadIds.forEach((id) => markingReadRef.current.delete(id)); // allow retry
       }
     };
 
     markRead();
   }, [messages, conversation, currentUserId]);
 
+  // FIX: glow/unread badge not clearing while actively viewing a chat.
+  // The unread count only reset to 0 on the initial click into a
+  // conversation (see ConversationItem.js). If a new message arrives
+  // live WHILE you're already sitting in that conversation, the DB
+  // trigger increments the count again with nothing to clear it back
+  // to 0. This keeps the currently-open conversation's unread count
+  // pinned at 0 continuously: once when you open it, and again
+  // whenever the message list changes (a new message arriving live).
+  useEffect(() => {
+    if (!conversation) return;
+
+    const isUser1 = currentUserId === conversation.user1_id;
+    const myUnreadColumn = isUser1 ? 'unread_count_user1' : 'unread_count_user2';
+    const currentUnread = conversation[myUnreadColumn] || 0;
+
+    if (currentUnread === 0) return;
+
+    const resetUnread = async () => {
+      const { error } = await supabase
+        .from('conversations')
+        .update({ [myUnreadColumn]: 0 })
+        .eq('id', conversation.id);
+
+      if (error) console.error('Error resetting unread count:', error);
+    };
+
+    resetUnread();
+  }, [conversation, messages, currentUserId]);
+
   const handleSend = async (content) => {
     if (!content.trim() || !conversation) return;
 
     try {
-      const now = new Date().toISOString();
-      
-      const newMessage = {
-        conversation: conversation.id,
-        sender_id: currentUserId,
-        content: content.trim(),
-        created_at: now,
-        read_user1: currentUserId === conversation.user1_id,
-        read_user2: currentUserId === conversation.user2_id,
-      };
-
-      console.log('📤 Sending message:', newMessage);
-
-      // Insert the message
       const { data, error } = await supabase
         .from('messages')
-        .insert(newMessage)
+        .insert({
+          conversation: conversation.id,
+          sender_id: currentUserId,
+          content: content.trim(),
+          created_at: new Date().toISOString(),
+          read_user1: currentUserId === conversation.user1_id,
+          read_user2: currentUserId === conversation.user2_id,
+        })
         .select();
 
-      if (error) {
-        console.error('❌ Insert error:', error);
-        throw error;
-      }
+      if (error) throw error;
 
-      console.log('✅ Message inserted successfully:', data);
-      
-      // Update the conversation
-      const { error: updateError } = await supabase
-        .from('conversations')
-        .update({
-          last_message: content.trim(),
-          updated_at: now
-        })
-        .eq('id', conversation.id);
-
-      if (updateError) {
-        console.error('❌ Error updating conversation:', updateError);
-      }
-
-      // Notify parent to update conversation list
-      if (onMessageSent && data && data.length > 0) {
-        onMessageSent(data[0]);
-      }
-
-      // Optimistically update UI
       if (data && data.length > 0) {
-        setMessages(prev => {
-          if (prev.some(m => m.id === data[0].id)) {
-            return prev;
-          }
-          return [...prev, data[0]];
-        });
-        
-        // 🔥 Scroll to bottom instantly after sending
-        setTimeout(() => {
-          scrollToBottomInstant();
-        }, 10);
+        setMessages(prev =>
+          prev.some(m => m.id === data[0].id) ? prev : [...prev, data[0]]
+        );
       }
-
     } catch (err) {
       console.error('Error sending message:', err);
       setError(`Failed to send message: ${err.message}`);
@@ -282,11 +221,7 @@ export default function ConversationView({ conversation, currentUserId, onMessag
         {messages.length === 0 ? (
           <div className="no-messages">No messages yet. Say hello! 👋</div>
         ) : (
-          <MessagesList 
-            messages={messages} 
-            currentUserId={currentUserId} 
-            conversation={conversation} 
-          />
+          <MessagesList messages={messages} currentUserId={currentUserId} conversation={conversation} />
         )}
         <div ref={messagesEndRef} />
       </div>

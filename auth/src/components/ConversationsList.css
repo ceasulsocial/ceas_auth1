@@ -269,3 +269,93 @@
 .messages-list::-webkit-scrollbar-thumb:hover {
   background: #40444b;
 }
+
+/* ===== SIDEBAR STYLING ===== */
+.conversations-list {
+  width: 340px;
+  flex-shrink: 0;
+  background: #1e1f22;
+  border-right: 1px solid #2b2d31;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.conversations-list h2 {
+  padding: 20px 16px 16px 16px;
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid #2b2d31;
+  flex-shrink: 0;
+}
+
+.conversations-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 8px 8px 16px 8px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* ===== CONVERSATION ITEMS ===== */
+.conversations-list li {
+  padding: 0 !important;
+  margin-bottom: 2px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  background: transparent !important;
+  transform: none !important;
+}
+
+.conversations-list li.active {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-radius: 8px;
+}
+
+.conversations-list li.active .conversation-name {
+  color: #00bcd4 !important;
+}
+
+.conversations-list li:hover {
+  background: rgba(255, 255, 255, 0.04) !important;
+  transform: none !important;
+}
+
+/* Scrollbar styling */
+.conversations-list ul::-webkit-scrollbar {
+  width: 4px;
+}
+
+.conversations-list ul::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.conversations-list ul::-webkit-scrollbar-thumb {
+  background: #2b2d31;
+  border-radius: 4px;
+}
+
+.conversations-list ul::-webkit-scrollbar-thumb:hover {
+  background: #40444b;
+}
+
+/* Unread badge pulse animation */
+@keyframes pulse-badge {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+/* Glowing border for unread conversations */
+.conversation-unread {
+  border: 2px solid #00bcd4 !important;
+  box-shadow: 0 0 20px rgba(0, 188, 212, 0.15) !important;
+}
