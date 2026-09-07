@@ -26,26 +26,13 @@ export default function MessageInput({ onSend, conversationId, currentUserId, on
     }
   };
 
-  // ✅ This is the onMediaUpload function
-  const handleMediaUpload = () => {
-    console.log('📤 Media upload complete, refreshing messages...');
-    if (onMediaUpload) {
-      // Call multiple times with delays to ensure it triggers
-      setTimeout(onMediaUpload, 100);
-      setTimeout(onMediaUpload, 500);
-      setTimeout(onMediaUpload, 1000);
-    } else {
-      console.warn('⚠️ onMediaUpload prop is not defined');
-    }
-  };
-
   return (
-    <div style={styles.container}>
-      <form onSubmit={handleSubmit} style={styles.form}>
+    <div className="message-input-bar">
+      <form onSubmit={handleSubmit} className="message-input-form">
         <MediaUpload
           conversationId={conversationId}
           currentUserId={currentUserId}
-          onUploadComplete={handleMediaUpload}
+          onUploadComplete={onMediaUpload}
         />
         <input
           ref={inputRef}
@@ -54,17 +41,12 @@ export default function MessageInput({ onSend, conversationId, currentUserId, on
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Type a message..."
-          style={styles.input}
+          className="message-input-field"
         />
         <button
           type="submit"
           disabled={!value.trim()}
-          style={{
-            ...styles.sendButton,
-            background: value.trim() ? '#00bcd4' : '#40444b',
-            color: value.trim() ? '#181a1b' : '#72767d',
-            cursor: value.trim() ? 'pointer' : 'not-allowed',
-          }}
+          className="message-input-send"
         >
           Send
         </button>
@@ -72,36 +54,3 @@ export default function MessageInput({ onSend, conversationId, currentUserId, on
     </div>
   );
 }
-
-const styles = {
-  container: {
-    width: '100%',
-  },
-  form: {
-    display: 'flex',
-    gap: '8px',
-    alignItems: 'center',
-    padding: '4px 8px',
-    backgroundColor: '#40444b',
-    borderRadius: '8px',
-  },
-  input: {
-    flex: 1,
-    padding: '12px 16px',
-    backgroundColor: 'transparent',
-    border: 'none',
-    color: '#fff',
-    fontSize: '16px',
-    outline: 'none',
-    minHeight: '48px',
-  },
-  sendButton: {
-    border: 'none',
-    borderRadius: '6px',
-    padding: '10px 20px',
-    fontWeight: '600',
-    fontSize: '16px',
-    transition: 'all 0.2s',
-    minWidth: '70px',
-  },
-};

@@ -9,9 +9,8 @@ export function Home({ user, profile }) {
     await supabase.auth.signOut();
     navigate('/login');
   };
-  // for debugging
+
   const changeRoleHandle = () => {
-    console.log("Change Role button clicked");
     navigate('/role');
   };
 
@@ -28,7 +27,7 @@ export function Home({ user, profile }) {
         <hr />
         <div className={profile.role?.toLowerCase() === 'user' ? 'trainer-list-container' : 'trainer-dashboard-container'}>
           {profile.role?.toLowerCase() === 'user' && <TrainerList />}
-          {profile.role?.toLowerCase() === 'trainer' && <div>Trainer dashboard coming soon!</div>}
+          {profile.role?.toLowerCase() === 'trainer' && <div>Trainer dashboard coming soon.</div>}
         </div>
       </div>
     </div>

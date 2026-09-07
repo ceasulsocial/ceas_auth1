@@ -5,7 +5,7 @@ export function Auth() {
   const clickHandle = async () => {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { 
+      options: {
         queryParams: { prompt: 'select_account' },
         redirectTo: window.location.origin
       }
@@ -14,7 +14,7 @@ export function Auth() {
 
   return (
     <div className="auth-container">
-      <h2>Welcome!</h2>
+      <h2>Welcome</h2>
       <button className="login-btn" onClick={clickHandle}>
         Log in with Google
       </button>

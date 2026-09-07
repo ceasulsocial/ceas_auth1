@@ -27,11 +27,8 @@ function AppContent() {
   const { user, profile, loading } = useAuth();
   const location = useLocation();
 
-  // FIX: CSS too thin.
-  // The chat UI was being squeezed into the same 520px-max-width
-  // container used for the auth/home screens. The chat route now gets
-  // its own wide layout via the app-container--wide / app-content--chat
-  // modifier classes (see App.css), instead of reusing the narrow one.
+  // The chat route uses its own wide layout (app-container--wide /
+  // app-content--chat) instead of the narrower auth/home container.
   const isChatRoute = location.pathname.startsWith('/conversations');
 
   if (loading) {
@@ -53,7 +50,7 @@ function AppContent() {
   }
 
   return (
-    <div className="app">
+    <div className={isChatRoute ? 'app app--chat' : 'app'}>
       <div className={isChatRoute ? 'app-container app-container--wide' : 'app-container'}>
         {!isChatRoute && (
           <div className="app-header">

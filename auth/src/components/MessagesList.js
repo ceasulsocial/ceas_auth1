@@ -4,11 +4,17 @@ import './ConversationsList.css';
 export default function MessagesList({ messages, currentUserId, conversation }) {
   const endRef = useRef(null);
   const [mediaErrors, setMediaErrors] = useState({});
+  const isInitialRender = useRef(true);
 
+  // ✅ Scroll to bottom with RAF to prevent layout shift
   useEffect(() => {
     if (messages.length > 0 && endRef.current) {
-      endRef.current.scrollIntoView({ behavior: 'instant' });
+      // Use requestAnimationFrame to ensure DOM is ready
+      requestAnimationFrame(() => {
+        endRef.current?.scrollIntoView({ behavior: 'instant' });
+      });
     }
+    isInitialRender.current = false;
   }, [messages]);
 
   const isUser1 = conversation && currentUserId === conversation.user1_id;
@@ -27,16 +33,13 @@ export default function MessagesList({ messages, currentUserId, conversation }) 
   };
 
   const renderMedia = (msg) => {
-    if (!msg.media_url || mediaErrors[msg.id]) {
-      return null;
-    }
+    if (!msg.media_url || mediaErrors[msg.id]) return null;
 
     if (msg.media_type === 'video') {
       return (
-        <div style={styles.mediaContainer}>
+        <div className="message-media">
           <video
             controls
-            style={styles.videoPlayer}
             onError={() => handleMediaError(msg.id)}
             preload="metadata"
           >
@@ -49,22 +52,37 @@ export default function MessagesList({ messages, currentUserId, conversation }) 
 
     if (msg.media_type === 'audio') {
       return (
-        <div style={styles.audioContainer}>
+        <div className="message-audio">
           <audio
             controls
-            style={styles.audioPlayer}
             onError={() => handleMediaError(msg.id)}
           >
             <source src={msg.media_url} />
             Your browser does not support audio.
           </audio>
-          <span style={styles.audioIcon}>🎵</span>
         </div>
       );
     }
 
     return null;
   };
+
+  // ✅ If no messages, show empty state
+  if (messages.length === 0) {
+    return (
+      <div className="no-messages" style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center',
+        height: '100%',
+        color: '#99aab5',
+        fontSize: '16px',
+        padding: '20px'
+      }}>
+        No messages yet. Say hello. 👋
+      </div>
+    );
+  }
 
   return (
     <>
@@ -77,7 +95,7 @@ export default function MessagesList({ messages, currentUserId, conversation }) 
           msg[otherReadColumn];
 
         const hasMedia = msg.media_url && !mediaErrors[msg.id];
-        const hasContent = msg.content && msg.content !== '📹 Video: undefined';
+        const hasContent = msg.content && msg.content !== 'Video: undefined';
 
         return (
           <div
@@ -85,18 +103,14 @@ export default function MessagesList({ messages, currentUserId, conversation }) 
             className={`message-wrapper ${isOwn ? 'own' : 'other'}`}
           >
             <div className={`message ${isOwn ? 'own' : ''}`}>
-              {/* Show media if present, otherwise show text */}
               {hasMedia ? (
                 renderMedia(msg)
               ) : (
                 hasContent && <div>{msg.content}</div>
               )}
 
-              {/* Show error if media failed */}
               {mediaErrors[msg.id] && msg.media_url && (
-                <div style={styles.mediaError}>
-                  {msg.media_type === 'video' ? '📹' : '🎵'} Media unavailable
-                </div>
+                <div className="message-media-error">Media unavailable</div>
               )}
 
               <div className="msg-meta">
@@ -117,40 +131,3 @@ export default function MessagesList({ messages, currentUserId, conversation }) 
     </>
   );
 }
-
-const styles = {
-  mediaContainer: {
-    maxWidth: '400px',
-    borderRadius: '8px',
-    overflow: 'hidden',
-    marginBottom: '4px',
-  },
-  videoPlayer: {
-    width: '100%',
-    maxHeight: '400px',
-    borderRadius: '8px',
-    backgroundColor: '#000',
-  },
-  audioContainer: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    padding: '8px 12px',
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    borderRadius: '8px',
-    marginBottom: '4px',
-    minWidth: '250px',
-  },
-  audioPlayer: {
-    flex: 1,
-    height: '40px',
-  },
-  audioIcon: {
-    fontSize: '24px',
-  },
-  mediaError: {
-    color: '#ed4245',
-    padding: '8px',
-    fontSize: '14px',
-  },
-};

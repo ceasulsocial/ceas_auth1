@@ -10,14 +10,11 @@ export function RoleSelection() {
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
-
-  // Persist role selection in localStorage and always sync state
   const handleRoleSelect = (selectedRole) => {
     setRole(selectedRole);
     localStorage.setItem('selectedRole', selectedRole);
   };
 
-  // Always initialize from localStorage on mount
   React.useEffect(() => {
     const saved = localStorage.getItem('selectedRole');
     if (saved) setRole(saved);
@@ -31,16 +28,16 @@ export function RoleSelection() {
       const { error: supabaseError } = await supabase
         .from('profiles')
         .upsert(
-          { 
-            id: user.id, 
+          {
+            id: user.id,
             role,
             full_name: user.user_metadata?.full_name || ''
-          }, 
+          },
           { onConflict: 'id' }
         );
       if (supabaseError) throw supabaseError;
       await refreshProfile();
-      localStorage.removeItem('selectedRole'); // clear after submit
+      localStorage.removeItem('selectedRole');
       navigate('/', { replace: true });
     } catch (err) {
       console.error('Role update failed:', err);
@@ -55,28 +52,26 @@ export function RoleSelection() {
       <h2 className="role-title">Select Your Role</h2>
       <p className="role-subtitle">Choose how you'll use the platform</p>
       <div className="role-options">
-        <button 
-          onClick={() => handleRoleSelect('user')} 
+        <button
+          onClick={() => handleRoleSelect('user')}
           className={`role-option user${role === 'user' ? ' active' : ''}`}
           disabled={loading}
         >
-          <span className="role-icon"></span>
           <span className="role-label">User</span>
           <p className="role-description">Browse trainers and book sessions</p>
         </button>
-        <button 
-          onClick={() => handleRoleSelect('trainer')} 
+        <button
+          onClick={() => handleRoleSelect('trainer')}
           className={`role-option trainer${role === 'trainer' ? ' active' : ''}`}
           disabled={loading}
         >
-          <span className="role-icon"></span>
           <span className="role-label">Trainer</span>
           <p className="role-description">Manage clients and schedule</p>
         </button>
       </div>
       <div className="role-action">
-        <button 
-          onClick={handleSubmit} 
+        <button
+          onClick={handleSubmit}
           disabled={!role || loading}
           className="submit-btn"
         >
@@ -89,7 +84,7 @@ export function RoleSelection() {
       </div>
       {error && (
         <div className="error-message">
-          ⚠️ {error}
+          {error}
         </div>
       )}
     </div>

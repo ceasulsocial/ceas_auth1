@@ -26,7 +26,7 @@
   border-radius: 4px;
   cursor: pointer;
   font-weight: bold;
-  min-width: 0; /* don't inherit the global button min-width here */
+  min-width: 0;
 }
 
 .error-message button:hover {
@@ -43,45 +43,14 @@
   font-size: 16px;
 }
 
-/* =====================================================================
-   FIX: CSS too thin / messy.
-
-   .conversations-page, .messages-header, .message and .message.own were
-   referenced in the JS (ConversationsList.js, ConversationView.js,
-   MessagesList.js) but never actually defined anywhere in the CSS, so
-   the whole chat layout and every message bubble were rendering with
-   zero custom styling — just browser defaults. Combined with the old
-   520px app-container cap (now bypassed for this route in App.js), this
-   was the main source of the "thin and messy" look.
-   ===================================================================== */
-
 .conversations-page {
   display: flex;
   flex-direction: row;
   width: 100%;
   height: 100%;
-  min-height: 0; /* required alongside height: 100% so this doesn't grow past its bounded parent */
+  min-height: 0;
   background: #181a1b;
   color: #fff;
-}
-
-.conversations-list {
-  width: 320px;
-  flex-shrink: 0;
-  padding: 1.5rem 1rem;
-  border-right: 1px solid #2c2f33;
-  overflow-y: auto;
-}
-
-.conversations-list h2 {
-  margin: 0 0 1rem 0;
-  font-size: 1.3rem;
-}
-
-.conversations-list ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
 }
 
 .messages-header {
@@ -123,6 +92,7 @@
   width: 100%;
   flex-direction: column;
 }
+
 .message-wrapper.own {
   align-items: flex-end;
 }
@@ -144,48 +114,49 @@
   text-align: right;
 }
 
-/* FIX: read receipts. Subtle "Seen" label shown under the last message
-   you sent, once the other person has read it. */
 .msg-seen {
   color: #00bcd4;
   font-weight: 600;
 }
 
-/* Fix for message input inside the form */
-.send-message-form {
-  display: flex;
-  gap: 0.5rem;
-  border-top: 1px solid #222;
-  padding-top: 0.7rem;
+/* ===== MESSAGE INPUT BAR ===== */
+.message-input-bar {
   width: 100%;
 }
 
-/* Classes used directly by MessageInput.js */
 .message-input-form {
   display: flex;
-  gap: 0.5rem;
-  border-top: 1px solid #222;
-  padding-top: 0.7rem;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 8px;
+  background-color: #40444b;
+  border-radius: 8px;
   width: 100%;
 }
 
 .message-input-field {
   flex: 1;
-  padding: 0.7em 1em;
+  padding: 12px 16px;
   border-radius: 8px;
   border: none;
-  background: #23272a;
+  background: transparent;
   color: #fff;
-  font-size: 1rem;
+  font-size: 16px;
+  outline: none;
   min-height: 48px;
 }
 
-/* .btn-md (from App.css) already sets sizing; this only sets the
-   send button's distinct color so it still matches other buttons in
-   width/padding while keeping its accent color. */
 .message-input-send {
+  border: none;
+  border-radius: 6px;
+  padding: 10px 20px;
+  font-weight: 600;
+  font-size: 16px;
+  min-width: 70px;
+  transition: background 0.2s, color 0.2s;
   background: #00bcd4;
   color: #181a1b;
+  cursor: pointer;
 }
 
 .message-input-send:hover:not(:disabled) {
@@ -196,36 +167,167 @@
 .message-input-send:disabled {
   background: #40444b;
   color: #72767d;
-  opacity: 0.5;
   cursor: not-allowed;
 }
 
-/* Fix for conversation items in list */
-.conversations-list li {
-  padding: 0.75rem 1rem;
-  margin-bottom: 0.5rem;
-  border-radius: 8px;
+/* ===== MEDIA UPLOAD (replaces inline styles previously in MediaUpload.js) ===== */
+.media-upload {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.media-upload-input {
+  display: none;
+}
+
+.media-upload-button {
+  background: transparent;
+  border: none;
+  color: #b9bbbe;
+  font-size: 20px;
   cursor: pointer;
-  background: #23272a;
-  transition: background 0.2s, color 0.2s, transform 0.1s;
-  font-weight: 500;
+  padding: 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+  min-width: 0;
 }
 
-.conversations-list li.active {
-  background: #2c2f33;
-  color: #00bcd4;
+.media-upload-button:hover {
+  background-color: rgba(255, 255, 255, 0.08);
 }
 
-.conversations-list li:hover {
-  background: #2c2f33;
-  color: #00bcd4;
-  transform: scale(1.02);
+.media-upload-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.media-upload-menu {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 8px;
+  background: #2f3136;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  padding: 6px;
+  min-width: 180px;
+  z-index: 1000;
+  border: 1px solid #40444b;
+}
+
+.media-upload-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  color: #dcddde;
+  width: 100%;
+  text-align: left;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  min-width: 0;
+}
+
+.media-upload-menu-item:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+.media-upload-menu-icon {
+  font-size: 18px;
+}
+
+.media-upload-progress {
+  position: relative;
+  height: 20px;
+  background-color: #2c2f33;
+  border-radius: 10px;
+  overflow: hidden;
+  min-width: 120px;
+}
+
+.media-upload-progress-bar {
+  height: 100%;
+  background-color: #00bcd4;
+  transition: width 0.3s;
+}
+
+.media-upload-progress-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #fff;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.media-upload-progress-label {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  color: #b9bbbe;
+  font-size: 10px;
+}
+
+.media-upload-error {
+  color: #ed4245;
+  font-size: 13px;
+  padding: 4px 8px;
+  background-color: rgba(237, 66, 69, 0.1);
+  border-radius: 4px;
+}
+
+/* ===== MESSAGE MEDIA (replaces inline styles previously in MessagesList.js) ===== */
+.message-media {
+  max-width: 400px;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.message-media video {
+  width: 100%;
+  max-height: 400px;
+  border-radius: 8px;
+  background-color: #000;
+}
+
+.message-audio {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  margin-bottom: 4px;
+  min-width: 250px;
+}
+
+.message-audio audio {
+  flex: 1;
+  height: 40px;
+}
+
+.message-audio-icon {
+  font-size: 24px;
+}
+
+.message-media-error {
+  color: #ed4245;
+  padding: 8px;
+  font-size: 14px;
 }
 
 /* Fix for messages section */
 .messages-section {
   flex: 1;
-  min-height: 0; /* required so this shrinks instead of growing with content */
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background: #181a1b;
@@ -241,18 +343,11 @@
   margin-bottom: 1rem;
   display: flex;
   flex-direction: column;
-  /* FIX: message bubbles filling the entire width/height.
-     Without this, the default align-items: stretch forces every
-     child (each .message bubble) to fill the full container width,
-     overriding .message's own max-width. align-items: flex-start
-     makes children size to their own content by default, and each
-     .message's align-self then only controls left/right position. */
   align-items: flex-start;
   gap: 0.5rem;
   padding: 0.5rem 0;
 }
 
-/* Make messages scrollable */
 .messages-list::-webkit-scrollbar {
   width: 8px;
 }
@@ -270,7 +365,7 @@
   background: #40444b;
 }
 
-/* ===== SIDEBAR STYLING ===== */
+/* ===== SIDEBAR ===== */
 .conversations-list {
   width: 340px;
   flex-shrink: 0;
@@ -301,32 +396,6 @@
   flex: 1;
 }
 
-/* ===== CONVERSATION ITEMS ===== */
-.conversations-list li {
-  padding: 0 !important;
-  margin-bottom: 2px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-  background: transparent !important;
-  transform: none !important;
-}
-
-.conversations-list li.active {
-  background: rgba(255, 255, 255, 0.06) !important;
-  border-radius: 8px;
-}
-
-.conversations-list li.active .conversation-name {
-  color: #00bcd4 !important;
-}
-
-.conversations-list li:hover {
-  background: rgba(255, 255, 255, 0.04) !important;
-  transform: none !important;
-}
-
-/* Scrollbar styling */
 .conversations-list ul::-webkit-scrollbar {
   width: 4px;
 }
@@ -344,7 +413,259 @@
   background: #40444b;
 }
 
-/* Unread badge pulse animation */
+.conversations-list li {
+  padding: 0;
+  margin-bottom: 2px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  background: transparent;
+}
+
+.conversations-list li.active {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+}
+
+/* ===== CONVERSATION ITEM (replaces inline styles previously in ConversationItem.js) ===== */
+.conversation-item {
+  padding: 12px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  background-color: transparent;
+  position: relative;
+  border: 2px solid transparent;
+  margin-bottom: 2px;
+}
+
+.conversation-item:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.conversation-item--unread {
+  border-color: #00bcd4;
+  box-shadow: 0 0 20px rgba(0, 188, 212, 0.15);
+}
+
+.conversation-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.conversation-item-name {
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.conversation-item-name--unread {
+  font-weight: 700;
+}
+
+.conversation-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.conversation-item-time {
+  color: #72767d;
+  font-size: 11px;
+}
+
+.conversation-item-badge {
+  background-color: #00bcd4;
+  color: #181a1b;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+  min-width: 20px;
+  text-align: center;
+  animation: pulse-badge 1.5s ease-in-out infinite;
+}
+
+.conversation-item-preview {
+  color: #b9bbbe;
+  font-size: 13px;
+  opacity: 0.8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.conversation-item-preview--unread {
+  color: #ffffff;
+  opacity: 1;
+  font-weight: 500;
+}
+
+.conversation-item-preview-empty {
+  font-size: 10px;
+  color: #72767d;
+  font-style: italic;
+}
+
+@keyframes pulse-badge {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+/* ===== CONVERSATION VIEW CONTAINER ===== */
+.conversation-view-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+.loading-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  min-height: 200px;
+  color: #99aab5;
+  font-size: 16px;
+}
+
+.messages-list-container {
+  flex: 1;
+  overflow-y: auto;
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  min-height: 200px;
+  max-height: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-anchor: none;
+  scroll-behavior: auto;
+}
+
+.messages-list-container .no-messages {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  min-height: 200px;
+  color: #99aab5;
+  font-size: 16px;
+}
+
+.send-message-form {
+  display: flex;
+  gap: 0.5rem;
+  border-top: 1px solid #2c2f33;
+  padding-top: 0.7rem;
+  width: 100%;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+/* ===== CONVERSATION ITEM ===== */
+.conversation-item {
+  padding: 12px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  background-color: transparent;
+  position: relative;
+  border: 2px solid transparent;
+  margin-bottom: 2px;
+}
+
+.conversation-item:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.conversation-item--unread {
+  border-color: #00bcd4;
+  box-shadow: 0 0 20px rgba(0, 188, 212, 0.15);
+}
+
+.conversation-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.conversation-item-name {
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.conversation-item-name--unread {
+  font-weight: 700;
+}
+
+.conversation-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.conversation-item-time {
+  color: #72767d;
+  font-size: 11px;
+}
+
+.conversation-item-badge {
+  background-color: #00bcd4;
+  color: #181a1b;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+  min-width: 20px;
+  text-align: center;
+  animation: pulse-badge 1.5s ease-in-out infinite;
+}
+
+.conversation-item-preview {
+  color: #b9bbbe;
+  font-size: 13px;
+  opacity: 0.8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.conversation-item-preview--unread {
+  color: #ffffff;
+  opacity: 1;
+  font-weight: 500;
+}
+
+.conversation-item-preview-empty {
+  font-size: 10px;
+  color: #72767d;
+  font-style: italic;
+}
+
+/* ===== GLOW ANIMATION ===== */
 @keyframes pulse-badge {
   0%, 100% {
     transform: scale(1);
@@ -354,8 +675,11 @@
   }
 }
 
-/* Glowing border for unread conversations */
-.conversation-unread {
-  border: 2px solid #00bcd4 !important;
-  box-shadow: 0 0 20px rgba(0, 188, 212, 0.15) !important;
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(0, 188, 212, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 35px rgba(0, 188, 212, 0.3);
+  }
 }
