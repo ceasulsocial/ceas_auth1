@@ -76,9 +76,11 @@ export default function MediaUpload({ conversationId, currentUserId, onUploadCom
         .from('media')
         .getPublicUrl(filePath);
 
-      const mediaTypeLabel = type === 'video' ? 'Video' : 'Audio';
-      const fileName = file.name.replace(/\.[^/.]+$/, '');
-      const content = `${mediaTypeLabel}: ${fileName}`;
+      // const mediaTypeLabel = type === 'video' ? 'Video' : 'Audio';
+      // const fileName = file.name.replace(/\.[^/.]+$/, '');
+      // const content = `${mediaTypeLabel}: ${fileName}`;
+
+      const content = type === 'video' ? 'Sent a video' : 'Sent an audio file';
 
       const { error: messageError } = await supabase
         .from('messages')

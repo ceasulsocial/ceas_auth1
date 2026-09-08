@@ -9,6 +9,8 @@ export default function ConversationView({ conversation, currentUserId }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const messagesEndRef = useRef(null);
+  // Tracks message ids currently being marked as read, so an in-flight
+  // update can't be triggered again before it resolves.
   const markingReadRef = useRef(new Set());
 
   useEffect(() => {
@@ -36,6 +38,9 @@ export default function ConversationView({ conversation, currentUserId }) {
     setLoading(true);
     fetchInitialMessages();
 
+    // Each event type is handled separately, patching local state
+    // directly from the payload instead of re-querying the whole
+    // table on every change.
     const channel = supabase
       .channel('messages_' + conversation.id)
       .on(
@@ -64,13 +69,16 @@ export default function ConversationView({ conversation, currentUserId }) {
       )
       .subscribe((status, err) => {
         if (err) console.error('Realtime subscription error:', err);
-        console.log('Realtime channel status:', status);
       });
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [conversation]);
+    // Depends only on the conversation id, not the whole object — the
+    // parent replaces the conversation object on every unread-count or
+    // last-message update, and re-running this effect on every one of
+    // those would tear down and rebuild the subscription unnecessarily.
+  }, [conversation?.id]);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -78,6 +86,9 @@ export default function ConversationView({ conversation, currentUserId }) {
     }
   }, [messages]);
 
+  // Read receipts, using the read_user1 / read_user2 columns. Guarded
+  // against re-firing on ids already being marked, so an UPDATE event
+  // can't accidentally trigger a duplicate in-flight request.
   useEffect(() => {
     if (!conversation || messages.length === 0) return;
 
@@ -111,6 +122,30 @@ export default function ConversationView({ conversation, currentUserId }) {
 
     markRead();
   }, [messages, conversation, currentUserId]);
+
+  // Keeps the currently-open conversation's unread count pinned at 0:
+  // once when it's opened, and again whenever a new message arrives
+  // live while it's open.
+  useEffect(() => {
+    if (!conversation) return;
+
+    const isUser1 = currentUserId === conversation.user1_id;
+    const myUnreadColumn = isUser1 ? 'unread_count_user1' : 'unread_count_user2';
+    const currentUnread = conversation[myUnreadColumn] || 0;
+
+    if (currentUnread === 0) return;
+
+    const resetUnread = async () => {
+      const { error } = await supabase
+        .from('conversations')
+        .update({ [myUnreadColumn]: 0 })
+        .eq('id', conversation.id);
+
+      if (error) console.error('Error resetting unread count:', error);
+    };
+
+    resetUnread();
+  }, [conversation, messages, currentUserId]);
 
   const handleSend = async (content) => {
     if (!content.trim() || !conversation) return;
@@ -176,7 +211,12 @@ export default function ConversationView({ conversation, currentUserId }) {
       </div>
 
       <div className="send-message-form">
-        <MessageInput onSend={handleSend} />
+        <MessageInput
+          onSend={handleSend}
+          conversationId={conversation.id}
+          currentUserId={currentUserId}
+          onMediaUpload={() => {}}
+        />
       </div>
     </>
   );
