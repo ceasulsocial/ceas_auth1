@@ -1,3 +1,4 @@
+// src/components/ConversationsList.js
 import { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -5,6 +6,17 @@ import { supabase } from '../supabaseClient';
 import ConversationItem from './ConversationItem';
 import ConversationView from './ConversationView';
 import './ConversationsList.css';
+
+// ✅ Mirrors the SQL trigger's COALESCE fallback — never null
+function getPreviewText(message) {
+  if (message.content && message.content.trim().length > 0) {
+    return message.content;
+  }
+  if (message.media_type === 'video') return '📹 Sent a video';
+  if (message.media_type === 'audio') return '🎵 Sent an audio file';
+  if (message.media_type) return '📎 Sent an attachment';
+  return 'New message';
+}
 
 export default function ConversationsList() {
   const { user } = useAuth();
@@ -15,6 +27,34 @@ export default function ConversationsList() {
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
   const isMounted = useRef(true);
+
+  // ✅ Handle message sent — updates sidebar preview immediately
+  const handleMessageSent = useRef((message) => {
+    const preview = getPreviewText(message);
+    const timestamp = message.created_at || new Date().toISOString();
+
+    setConversations((prev) => {
+      const updated = prev.map((conv) => {
+        if (conv.id === message.conversation) {
+          return {
+            ...conv,
+            last_message: preview,
+            updated_at: timestamp,
+          };
+        }
+        return conv;
+      });
+      return updated.sort(
+        (a, b) => new Date(b.updated_at) - new Date(a.updated_at)
+      );
+    });
+
+    setSelected((prev) =>
+      prev?.id === message.conversation
+        ? { ...prev, last_message: preview, updated_at: timestamp }
+        : prev
+    );
+  }).current;
 
   useEffect(() => {
     isMounted.current = true;
@@ -39,7 +79,7 @@ export default function ConversationsList() {
 
         const convId = location.state?.conversationId;
         if (convId) {
-          const found = data?.find(c => c.id === convId);
+          const found = data?.find((c) => c.id === convId);
           if (found) {
             setSelected(found);
             navigate('/conversations', { replace: true });
@@ -59,57 +99,64 @@ export default function ConversationsList() {
 
     fetchInitial();
 
+    // ── Realtime: conversation updates ──
     const conversationChannel = supabase
       .channel('conversations_channel')
-      .on('postgres_changes',
+      .on(
+        'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'conversations' },
         (payload) => {
           if (!isMounted.current) return;
-          setConversations(prev => {
-            const updated = prev.map(conv =>
+          setConversations((prev) => {
+            const updated = prev.map((conv) =>
               conv.id === payload.new.id ? payload.new : conv
             );
-            return updated.sort((a, b) =>
-              new Date(b.updated_at) - new Date(a.updated_at)
+            return updated.sort(
+              (a, b) => new Date(b.updated_at) - new Date(a.updated_at)
             );
           });
-          setSelected(prev => {
+          setSelected((prev) => {
             if (prev?.id === payload.new.id) return payload.new;
             return prev;
           });
         }
       )
-      .on('postgres_changes',
+      .on(
+        'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'conversations' },
         (payload) => {
           if (!isMounted.current) return;
-          setConversations(prev => [payload.new, ...prev]);
+          setConversations((prev) => [payload.new, ...prev]);
         }
       )
       .subscribe();
 
-    // Updates last_message locally for immediate display in the
-    // sidebar; the actual persisted last_message/updated_at/unread
-    // counts come from the database trigger on the messages table.
+    // ── Realtime: new message inserts ──
+    // Updates last_message locally for immediate sidebar display.
+    // The DB trigger handles the persisted values.
     const messageChannel = supabase
       .channel('messages_channel')
-      .on('postgres_changes',
+      .on(
+        'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages' },
         (payload) => {
           if (!isMounted.current) return;
-          setConversations(prev => {
-            const updated = prev.map(conv => {
+          const preview = getPreviewText(payload.new);
+          const timestamp = payload.new.created_at || new Date().toISOString();
+
+          setConversations((prev) => {
+            const updated = prev.map((conv) => {
               if (conv.id === payload.new.conversation) {
                 return {
                   ...conv,
-                  last_message: payload.new.content,
-                  updated_at: new Date().toISOString()
+                  last_message: preview,
+                  updated_at: timestamp,
                 };
               }
               return conv;
             });
-            return updated.sort((a, b) =>
-              new Date(b.updated_at) - new Date(a.updated_at)
+            return updated.sort(
+              (a, b) => new Date(b.updated_at) - new Date(a.updated_at)
             );
           });
         }
@@ -136,7 +183,7 @@ export default function ConversationsList() {
       <div className="conversations-list">
         <h2>Conversations</h2>
         <ul>
-          {conversations.map(conv => (
+          {conversations.map((conv) => (
             <li
               key={conv.id}
               onClick={() => setSelected(conv)}
@@ -145,7 +192,6 @@ export default function ConversationsList() {
               <ConversationItem
                 conversation={conv}
                 currentUserId={userId}
-                onClick={() => setSelected(conv)}
                 isActive={selected?.id === conv.id}
               />
             </li>
@@ -156,6 +202,7 @@ export default function ConversationsList() {
         <ConversationView
           conversation={selected}
           currentUserId={userId}
+          onMessageSent={handleMessageSent}
         />
       </div>
     </div>

@@ -1,17 +1,48 @@
-import { useEffect, useState, useRef } from 'react';
+// src/components/ConversationView.js
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import MessagesList from './MessagesList';
 import MessageInput from './MessageInput';
+import { useMessageSender } from '../hooks/useMessageSender';
 import './ConversationsList.css';
 
-export default function ConversationView({ conversation, currentUserId }) {
+export default function ConversationView({
+  conversation,
+  currentUserId,
+  onMessageSent: onMessageSentProp,
+}) {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const messagesEndRef = useRef(null);
-  // Tracks message ids currently being marked as read, so an in-flight
-  // update can't be triggered again before it resolves.
   const markingReadRef = useRef(new Set());
+  const channelRef = useRef(null);
+  const scrollTimerRef = useRef(null);
+
+  const scheduleScroll = useCallback(() => {
+    if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
+    scrollTimerRef.current = setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
+    }, 50);
+  }, []);
+
+  const {
+    send,
+    cancel,
+    uploading,
+    error: sendError,
+    progress,
+  } = useMessageSender({
+    conversationId: conversation?.id,
+    currentUserId,
+    onMessageSent: (msg) => {
+      setMessages((prev) =>
+        prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]
+      );
+      onMessageSentProp?.(msg);
+      scheduleScroll();
+    },
+  });
 
   useEffect(() => {
     if (!conversation) return;
@@ -38,57 +69,78 @@ export default function ConversationView({ conversation, currentUserId }) {
     setLoading(true);
     fetchInitialMessages();
 
-    // Each event type is handled separately, patching local state
-    // directly from the payload instead of re-querying the whole
-    // table on every change.
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+    }
+
     const channel = supabase
       .channel('messages_' + conversation.id)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation=eq.${conversation.id}` },
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation=eq.${conversation.id}`,
+        },
         (payload) => {
-          setMessages(prev =>
-            prev.some(m => m.id === payload.new.id) ? prev : [...prev, payload.new]
+          setMessages((prev) =>
+            prev.some((m) => m.id === payload.new.id)
+              ? prev
+              : [...prev, payload.new]
           );
+          scheduleScroll();
         }
       )
       .on(
         'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'messages', filter: `conversation=eq.${conversation.id}` },
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation=eq.${conversation.id}`,
+        },
         (payload) => {
-          setMessages(prev => prev.map(m => (m.id === payload.new.id ? payload.new : m)));
+          setMessages((prev) =>
+            prev.map((m) => (m.id === payload.new.id ? payload.new : m))
+          );
           markingReadRef.current.delete(payload.new.id);
         }
       )
       .on(
         'postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'messages', filter: `conversation=eq.${conversation.id}` },
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation=eq.${conversation.id}`,
+        },
         (payload) => {
-          setMessages(prev => prev.filter(m => m.id !== payload.old.id));
+          setMessages((prev) => prev.filter((m) => m.id !== payload.old.id));
         }
       )
-      .subscribe((status, err) => {
-        if (err) console.error('Realtime subscription error:', err);
-      });
+      .subscribe();
+
+    channelRef.current = channel;
 
     return () => {
-      supabase.removeChannel(channel);
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+      if (scrollTimerRef.current) {
+        clearTimeout(scrollTimerRef.current);
+      }
     };
-    // Depends only on the conversation id, not the whole object — the
-    // parent replaces the conversation object on every unread-count or
-    // last-message update, and re-running this effect on every one of
-    // those would tear down and rebuild the subscription unnecessarily.
-  }, [conversation?.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversation?.id, scheduleScroll]);
 
   useEffect(() => {
     if (messages.length > 0) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
     }
   }, [messages]);
 
-  // Read receipts, using the read_user1 / read_user2 columns. Guarded
-  // against re-firing on ids already being marked, so an UPDATE event
-  // can't accidentally trigger a duplicate in-flight request.
   useEffect(() => {
     if (!conversation || messages.length === 0) return;
 
@@ -108,73 +160,35 @@ export default function ConversationView({ conversation, currentUserId }) {
 
     unreadIds.forEach((id) => markingReadRef.current.add(id));
 
-    const markRead = async () => {
-      const { error } = await supabase
-        .from('messages')
-        .update({ [myReadColumn]: true })
-        .in('id', unreadIds);
-
-      if (error) {
-        console.error('Error marking messages read:', error);
-        unreadIds.forEach((id) => markingReadRef.current.delete(id));
-      }
-    };
-
-    markRead();
+    supabase
+      .from('messages')
+      .update({ [myReadColumn]: true })
+      .in('id', unreadIds)
+      .then(({ error }) => {
+        if (error) {
+          console.error('Error marking messages read:', error);
+          unreadIds.forEach((id) => markingReadRef.current.delete(id));
+        }
+      });
   }, [messages, conversation, currentUserId]);
 
-  // Keeps the currently-open conversation's unread count pinned at 0:
-  // once when it's opened, and again whenever a new message arrives
-  // live while it's open.
   useEffect(() => {
     if (!conversation) return;
-
     const isUser1 = currentUserId === conversation.user1_id;
-    const myUnreadColumn = isUser1 ? 'unread_count_user1' : 'unread_count_user2';
+    const myUnreadColumn = isUser1
+      ? 'unread_count_user1'
+      : 'unread_count_user2';
     const currentUnread = conversation[myUnreadColumn] || 0;
-
     if (currentUnread === 0) return;
 
-    const resetUnread = async () => {
-      const { error } = await supabase
-        .from('conversations')
-        .update({ [myUnreadColumn]: 0 })
-        .eq('id', conversation.id);
-
-      if (error) console.error('Error resetting unread count:', error);
-    };
-
-    resetUnread();
-  }, [conversation, messages, currentUserId]);
-
-  const handleSend = async (content) => {
-    if (!content.trim() || !conversation) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('messages')
-        .insert({
-          conversation: conversation.id,
-          sender_id: currentUserId,
-          content: content.trim(),
-          created_at: new Date().toISOString(),
-          read_user1: currentUserId === conversation.user1_id,
-          read_user2: currentUserId === conversation.user2_id,
-        })
-        .select();
-
-      if (error) throw error;
-
-      if (data && data.length > 0) {
-        setMessages(prev =>
-          prev.some(m => m.id === data[0].id) ? prev : [...prev, data[0]]
-        );
-      }
-    } catch (err) {
-      console.error('Error sending message:', err);
-      setError(`Failed to send message: ${err.message}`);
-    }
-  };
+    supabase
+      .from('conversations')
+      .update({ [myUnreadColumn]: 0 })
+      .eq('id', conversation.id)
+      .then(({ error }) => {
+        if (error) console.error('Error resetting unread count:', error);
+      });
+  }, [conversation?.id, currentUserId]);
 
   if (!conversation) {
     return (
@@ -205,17 +219,22 @@ export default function ConversationView({ conversation, currentUserId }) {
         {messages.length === 0 ? (
           <div className="no-messages">No messages yet. Say hello.</div>
         ) : (
-          <MessagesList messages={messages} currentUserId={currentUserId} conversation={conversation} />
+          <MessagesList
+            messages={messages}
+            currentUserId={currentUserId}
+            conversation={conversation}
+          />
         )}
         <div ref={messagesEndRef} />
       </div>
 
       <div className="send-message-form">
         <MessageInput
-          onSend={handleSend}
-          conversationId={conversation.id}
-          currentUserId={currentUserId}
-          onMediaUpload={() => {}}
+          onSubmit={send}
+          onCancel={cancel}
+          uploading={uploading}
+          error={sendError}
+          progress={progress}
         />
       </div>
     </>

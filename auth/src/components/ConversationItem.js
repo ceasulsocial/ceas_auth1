@@ -77,7 +77,20 @@ function ConversationItem({ conversation, currentUserId, onClick, isActive }) {
     ? 'Loading...' 
     : otherUser?.full_name || `User ${otherUserId.slice(0, 8)}`;
 
-  const lastMessage = conversation.last_message || 'No messages yet';
+function getPreview(conversation) {
+  if (conversation.last_message && conversation.last_message.trim().length > 0) {
+    return conversation.last_message;
+  }
+
+  if (conversation.last_message_type === 'video') return '📹 Sent a video';
+  if (conversation.last_message_type === 'audio') return '🎵 Sent an audio file';
+  if (conversation.last_message_type) return '📎 Sent an attachment';
+
+  return 'No messages yet';
+}
+
+const lastMessage = getPreview(conversation);
+
   const timeAgo = formatTime(conversation.updated_at);
 
   // Mark as read when clicked
