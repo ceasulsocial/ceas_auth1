@@ -1,4 +1,3 @@
-// src/components/ConversationView.js
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { supabase } from '../supabaseClient';
 import MessagesList from './MessagesList';
@@ -15,10 +14,14 @@ export default function ConversationView({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const messagesEndRef = useRef(null);
+  // Tracks message ids currently being marked as read, so an in-flight
+  // update can't be triggered again before it resolves.
   const markingReadRef = useRef(new Set());
   const channelRef = useRef(null);
   const scrollTimerRef = useRef(null);
 
+  // Debounced so a burst of incoming messages doesn't trigger a scroll
+  // call per message.
   const scheduleScroll = useCallback(() => {
     if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
     scrollTimerRef.current = setTimeout(() => {
@@ -132,6 +135,10 @@ export default function ConversationView({
         clearTimeout(scrollTimerRef.current);
       }
     };
+    // Depends only on the conversation id, not the whole object — the
+    // parent replaces the conversation object on every unread-count or
+    // last-message update, and re-running this on every one of those
+    // would tear down and rebuild the subscription unnecessarily.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversation?.id, scheduleScroll]);
 
@@ -141,6 +148,9 @@ export default function ConversationView({
     }
   }, [messages]);
 
+  // Read receipts, using the read_user1 / read_user2 columns. Guarded
+  // against re-firing on ids already being marked, so an UPDATE event
+  // can't accidentally trigger a duplicate in-flight request.
   useEffect(() => {
     if (!conversation || messages.length === 0) return;
 
@@ -172,6 +182,11 @@ export default function ConversationView({
       });
   }, [messages, conversation, currentUserId]);
 
+  // Keeps the currently-open conversation's unread count pinned at 0.
+  // messages must stay in the dependency list: without it, this only
+  // resets the count once on open, and a message arriving live while
+  // already viewing the conversation would increment the count with
+  // nothing to clear it back to 0 again.
   useEffect(() => {
     if (!conversation) return;
     const isUser1 = currentUserId === conversation.user1_id;
@@ -188,7 +203,7 @@ export default function ConversationView({
       .then(({ error }) => {
         if (error) console.error('Error resetting unread count:', error);
       });
-  }, [conversation?.id, currentUserId]);
+  }, [conversation, messages, currentUserId]);
 
   if (!conversation) {
     return (

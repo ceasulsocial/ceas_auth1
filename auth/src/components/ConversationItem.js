@@ -1,53 +1,66 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 
+// Pure helper, kept outside the component so it isn't redefined on
+// every render.
+function getPreview(conversation) {
+  if (conversation.last_message && conversation.last_message.trim().length > 0) {
+    return conversation.last_message;
+  }
+
+  if (conversation.last_message_type === 'video') return 'Sent a video';
+  if (conversation.last_message_type === 'audio') return 'Sent an audio file';
+  if (conversation.last_message_type) return 'Sent an attachment';
+
+  return 'No messages yet';
+}
+
 function ConversationItem({ conversation, currentUserId, onClick, isActive }) {
   const [otherUser, setOtherUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  
-  const otherUserId = conversation.user1_id === currentUserId 
-    ? conversation.user2_id 
+
+  const otherUserId = conversation.user1_id === currentUserId
+    ? conversation.user2_id
     : conversation.user1_id;
 
-  // Determine if current user is user1 or user2
   const isUser1 = currentUserId === conversation.user1_id;
-  
-  // Get unread count from the correct column
-  const unreadCount = isUser1 
+
+  const unreadCount = isUser1
     ? (conversation.unread_count_user1 || 0)
     : (conversation.unread_count_user2 || 0);
 
-  // Check if this conversation has unread messages
   const hasUnread = unreadCount > 0;
 
-  // ✅ Show badge only if unread AND not currently selected
+  // Badge only shows when unread AND this isn't the currently-open
+  // conversation — ConversationView separately keeps the DB count
+  // pinned at 0 while open, but gating on isActive here means the
+  // badge can't flash on even briefly if that update hasn't landed yet.
   const showBadge = hasUnread && !isActive;
 
-  // Format time nicely
   const formatTime = (timestamp) => {
     if (!timestamp) return '';
     const date = new Date(timestamp);
     const now = new Date();
     const diff = now - date;
-    
+
     if (diff < 60 * 1000) return 'Just now';
     if (diff < 60 * 60 * 1000) {
       const mins = Math.floor(diff / (60 * 1000));
       return `${mins}m ago`;
     }
     if (diff < 24 * 60 * 60 * 1000) {
-      return date.toLocaleTimeString('en-US', { 
-        hour: '2-digit', 
+      return date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
         minute: '2-digit',
-        hour12: true 
+        hour12: true
       });
     }
     if (diff < 7 * 24 * 60 * 60 * 1000) {
       return date.toLocaleDateString('en-US', { weekday: 'short' });
     }
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric' 
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric'
     });
   };
 
@@ -59,7 +72,7 @@ function ConversationItem({ conversation, currentUserId, onClick, isActive }) {
           .select('full_name')
           .eq('id', otherUserId)
           .single();
-        
+
         if (error) throw error;
         setOtherUser(data);
       } catch (err) {
@@ -69,31 +82,17 @@ function ConversationItem({ conversation, currentUserId, onClick, isActive }) {
         setLoading(false);
       }
     };
-    
+
     fetchUser();
   }, [otherUserId]);
 
-  const displayName = loading 
-    ? 'Loading...' 
+  const displayName = loading
+    ? 'Loading...'
     : otherUser?.full_name || `User ${otherUserId.slice(0, 8)}`;
 
-function getPreview(conversation) {
-  if (conversation.last_message && conversation.last_message.trim().length > 0) {
-    return conversation.last_message;
-  }
-
-  if (conversation.last_message_type === 'video') return '📹 Sent a video';
-  if (conversation.last_message_type === 'audio') return '🎵 Sent an audio file';
-  if (conversation.last_message_type) return '📎 Sent an attachment';
-
-  return 'No messages yet';
-}
-
-const lastMessage = getPreview(conversation);
-
+  const lastMessage = getPreview(conversation);
   const timeAgo = formatTime(conversation.updated_at);
 
-  // Mark as read when clicked
   const handleClick = () => {
     if (hasUnread) {
       const updateField = isUser1 ? 'unread_count_user1' : 'unread_count_user2';
@@ -110,7 +109,7 @@ const lastMessage = getPreview(conversation);
   };
 
   return (
-    <div 
+    <div
       onClick={handleClick}
       style={{
         padding: '12px 16px',
@@ -159,7 +158,6 @@ const lastMessage = getPreview(conversation);
           }}>
             {timeAgo}
           </span>
-          {/* ✅ Badge only shows when unread AND not active */}
           {showBadge && (
             <span style={{
               backgroundColor: '#00bcd4',
@@ -190,7 +188,12 @@ const lastMessage = getPreview(conversation);
         fontWeight: hasUnread ? '500' : '400',
       }}>
         {lastMessage}
-        {!conversation.last_message && (
+        {/* FIX: this previously checked !conversation.last_message,
+            which is also true for a media-only message (no text, just
+            a video/audio type) — showing "Sent a video • Start
+            chatting" at the same time, which is contradictory. Now
+            only shows when there's genuinely no message of any kind. */}
+        {lastMessage === 'No messages yet' && (
           <span style={{
             fontSize: '10px',
             color: '#72767d',
