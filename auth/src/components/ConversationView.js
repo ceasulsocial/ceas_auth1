@@ -9,6 +9,7 @@ export default function ConversationView({
   conversation,
   currentUserId,
   onMessageSent: onMessageSentProp,
+  onTypingChange,
 }) {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -20,12 +21,56 @@ export default function ConversationView({
   const channelRef = useRef(null);
   const scrollTimerRef = useRef(null);
 
-  // Debounced so a burst of incoming messages doesn't trigger a scroll
-  // call per message.
+  // Typing indicator state
+  const [otherTyping, setOtherTyping] = useState(false);
+  const typingTimeoutRef = useRef(null);
+  const lastTypingSentRef = useRef(0);
+
+  // Tuning:
+  // - Send at most one typing broadcast per 3s.
+  // - Assume typing stopped if no event within 5s.
+  const TYPING_SEND_THROTTLE_MS = 3000;
+  const TYPING_STOP_TIMEOUT_MS = 5000;
+
+  // Notifies the parent (ConversationsList) so the sidebar can show
+  // "typing…" on the matching conversation. Only the currently-open
+  // conversation has an active channel, so this only ever fires for it.
+  const notifyTypingChange = useCallback(
+    (isTyping) => {
+      onTypingChange?.(conversation?.id, isTyping);
+    },
+    [conversation?.id, onTypingChange]
+  );
+
+  const setOtherTypingAndNotify = useCallback(
+    (isTyping) => {
+      setOtherTyping(isTyping);
+      notifyTypingChange(isTyping);
+    },
+    [notifyTypingChange]
+  );
+
+  // Throttled typing broadcast
+  const sendTyping = useCallback(() => {
+    const now = Date.now();
+    if (now - lastTypingSentRef.current < TYPING_SEND_THROTTLE_MS) return;
+    lastTypingSentRef.current = now;
+    channelRef.current?.send({
+      type: 'broadcast',
+      event: 'typing',
+      payload: { userId: currentUserId },
+    });
+  }, [currentUserId]);
+
+  // Scroll schedule
   const scheduleScroll = useCallback(() => {
     if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
     scrollTimerRef.current = setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
+        });
+      });
     }, 50);
   }, []);
 
@@ -70,6 +115,7 @@ export default function ConversationView({
     };
 
     setLoading(true);
+    setOtherTypingAndNotify(false);
     fetchInitialMessages();
 
     if (channelRef.current) {
@@ -92,6 +138,13 @@ export default function ConversationView({
               ? prev
               : [...prev, payload.new]
           );
+                if (payload.new.sender_id !== currentUserId) {
+            if (typingTimeoutRef.current) {
+              clearTimeout(typingTimeoutRef.current);
+              typingTimeoutRef.current = null;
+            }
+            setOtherTypingAndNotify(false);
+          }
           scheduleScroll();
         }
       )
@@ -122,6 +175,18 @@ export default function ConversationView({
           setMessages((prev) => prev.filter((m) => m.id !== payload.old.id));
         }
       )
+      .on('broadcast', { event: 'typing' }, ({ payload }) => {
+        // Ignore our own broadcast — Realtime echoes broadcasts back to the sender.
+        if (payload.userId === currentUserId) return;
+
+        setOtherTypingAndNotify(true);
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        // No explicit "stopped typing" event is sent — if no further
+        // typing event arrives within the timeout, assume they stopped.
+        typingTimeoutRef.current = setTimeout(() => {
+          setOtherTypingAndNotify(false);
+        }, TYPING_STOP_TIMEOUT_MS);
+      })
       .subscribe();
 
     channelRef.current = channel;
@@ -134,23 +199,20 @@ export default function ConversationView({
       if (scrollTimerRef.current) {
         clearTimeout(scrollTimerRef.current);
       }
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
     };
-    // Depends only on the conversation id, not the whole object — the
-    // parent replaces the conversation object on every unread-count or
-    // last-message update, and re-running this on every one of those
-    // would tear down and rebuild the subscription unnecessarily.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversation?.id, scheduleScroll]);
+  }, [conversation?.id, scheduleScroll, currentUserId]);
 
   useEffect(() => {
     if (messages.length > 0) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
+      scheduleScroll();
     }
-  }, [messages]);
+  }, [messages, scheduleScroll]);
 
-  // Read receipts, using the read_user1 / read_user2 columns. Guarded
-  // against re-firing on ids already being marked, so an UPDATE event
-  // can't accidentally trigger a duplicate in-flight request.
+  // Read receipts
   useEffect(() => {
     if (!conversation || messages.length === 0) return;
 
@@ -182,11 +244,7 @@ export default function ConversationView({
       });
   }, [messages, conversation, currentUserId]);
 
-  // Keeps the currently-open conversation's unread count pinned at 0.
-  // messages must stay in the dependency list: without it, this only
-  // resets the count once on open, and a message arriving live while
-  // already viewing the conversation would increment the count with
-  // nothing to clear it back to 0 again.
+  // Reset unread count while viewing
   useEffect(() => {
     if (!conversation) return;
     const isUser1 = currentUserId === conversation.user1_id;
@@ -238,10 +296,22 @@ export default function ConversationView({
             messages={messages}
             currentUserId={currentUserId}
             conversation={conversation}
+            onMediaLoad={scheduleScroll}
           />
         )}
         <div ref={messagesEndRef} />
       </div>
+
+      {otherTyping && (
+        <div className="typing-indicator">
+          <span className="typing-dots">
+            <span className="typing-dot" />
+            <span className="typing-dot" />
+            <span className="typing-dot" />
+          </span>
+          <span className="typing-text">typing…</span>
+        </div>
+      )}
 
       <div className="send-message-form">
         <MessageInput
@@ -250,6 +320,7 @@ export default function ConversationView({
           uploading={uploading}
           error={sendError}
           progress={progress}
+          onTyping={sendTyping}
         />
       </div>
     </>

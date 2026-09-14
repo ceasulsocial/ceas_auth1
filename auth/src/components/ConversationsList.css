@@ -6,6 +6,21 @@
   padding: 2rem;
 }
 
+/* NOTE: .loading-state below looks like it may be a renamed duplicate
+   of .loading, used by a newer version of ConversationView.js. Keeping
+   both until confirmed which one is actually rendered — remove the
+   unused one once confirmed. */
+.loading-state {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  min-height: 200px;
+  color: #99aab5;
+  font-size: 16px;
+}
+
 .error-message {
   background-color: #ed4245;
   color: white;
@@ -51,6 +66,15 @@
   min-height: 0;
   background: #181a1b;
   color: #fff;
+}
+
+/* ===== CONVERSATION VIEW CONTAINER ===== */
+.conversation-view-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
 }
 
 .messages-header {
@@ -119,9 +143,29 @@
   font-weight: 600;
 }
 
+.typing-indicator {
+  padding: 0.25rem 0 0.5rem 0;
+  font-size: 0.8rem;
+  color: #99aab5;
+  font-style: italic;
+}
+
+/* ===== MESSAGE CAPTION (renders below media in a bubble) ===== */
+.message-caption {
+  margin-top: 6px;
+  font-size: 14px;
+  line-height: 1.4;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
 /* ===== MESSAGE INPUT BAR ===== */
 .message-input-bar {
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: relative; /* anchors the absolutely-positioned attachment preview */
 }
 
 .message-input-form {
@@ -170,12 +214,164 @@
   cursor: not-allowed;
 }
 
-/* ===== MEDIA UPLOAD (replaces inline styles previously in MediaUpload.js) ===== */
+/* ===== ATTACHMENT PREVIEW (floats above input) ===== */
+.attachment-preview {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background: #2c2f33;
+  border-radius: 12px;
+  border: 1px solid #40444b;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.3);
+  max-width: 400px;
+  z-index: 20;
+}
+
+.attachment-remove {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #ed4245;
+  color: #fff;
+  border: none;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 0;
+  z-index: 10;
+  transition: background 0.2s;
+}
+
+.attachment-remove:hover:not(:disabled) {
+  background: #c93b3e;
+}
+
+.attachment-remove:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.attachment-preview-video {
+  max-width: 100%;
+  max-height: 200px;
+  border-radius: 8px;
+  background: #000;
+}
+
+.attachment-preview-audio {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.attachment-preview-audio-player {
+  flex: 1;
+  height: 40px;
+}
+
+.attachment-preview-icon {
+  font-size: 32px;
+}
+
+.attachment-preview-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  justify-content: center;
+  font-size: 12px;
+  color: #b9bbbe;
+  max-width: 100%;
+}
+
+.attachment-preview-name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 240px;
+}
+
+.attachment-preview-size {
+  color: #72767d;
+  flex-shrink: 0;
+}
+
+/* ===== UPLOAD PROGRESS / ERROR (used by MessageInput.js) ===== */
+.attachment-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: #2c2f33;
+  border-radius: 8px;
+  color: #b9bbbe;
+  font-size: 13px;
+}
+
+.attachment-progress-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #40444b;
+  border-top-color: #00bcd4;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.attachment-progress-text {
+  flex: 1;
+  color: #b9bbbe;
+}
+
+.attachment-cancel {
+  background: transparent;
+  border: 1px solid #ed4245;
+  color: #ed4245;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.attachment-cancel:hover {
+  background: #ed4245;
+  color: #fff;
+}
+
+.attachment-error {
+  color: #ed4245;
+  font-size: 13px;
+  padding: 8px 12px;
+  background: rgba(237, 66, 69, 0.1);
+  border-radius: 8px;
+}
+
+/* ===== MEDIA UPLOAD BUTTON ===== */
 .media-upload {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
 }
 
 .media-upload-input {
@@ -186,21 +382,25 @@
   background: transparent;
   border: none;
   color: #b9bbbe;
-  font-size: 20px;
+  font-size: 22px;
   cursor: pointer;
-  padding: 8px;
-  border-radius: 4px;
+  padding: 8px 12px;
+  border-radius: 6px;
   transition: background-color 0.2s;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.media-upload-button:hover {
+.media-upload-button:hover:not(:disabled) {
   background-color: rgba(255, 255, 255, 0.08);
+  color: #fff;
 }
 
 .media-upload-button:disabled {
   cursor: not-allowed;
-  opacity: 0.6;
+  opacity: 0.4;
 }
 
 .media-upload-menu {
@@ -241,49 +441,7 @@
   font-size: 18px;
 }
 
-.media-upload-progress {
-  position: relative;
-  height: 20px;
-  background-color: #2c2f33;
-  border-radius: 10px;
-  overflow: hidden;
-  min-width: 120px;
-}
-
-.media-upload-progress-bar {
-  height: 100%;
-  background-color: #00bcd4;
-  transition: width 0.3s;
-}
-
-.media-upload-progress-text {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  color: #fff;
-  font-size: 11px;
-  font-weight: bold;
-}
-
-.media-upload-progress-label {
-  position: absolute;
-  top: 50%;
-  right: 8px;
-  transform: translateY(-50%);
-  color: #b9bbbe;
-  font-size: 10px;
-}
-
-.media-upload-error {
-  color: #ed4245;
-  font-size: 13px;
-  padding: 4px 8px;
-  background-color: rgba(237, 66, 69, 0.1);
-  border-radius: 4px;
-}
-
-/* ===== MESSAGE MEDIA (replaces inline styles previously in MessagesList.js) ===== */
+/* ===== MESSAGE MEDIA ===== */
 .message-media {
   max-width: 400px;
   border-radius: 8px;
@@ -307,15 +465,18 @@
   border-radius: 8px;
   margin-bottom: 4px;
   min-width: 250px;
+  max-width: 100%;
 }
 
 .message-audio audio {
   flex: 1;
   height: 40px;
+  min-width: 0;
 }
 
 .message-audio-icon {
   font-size: 24px;
+  flex-shrink: 0;
 }
 
 .message-media-error {
@@ -340,7 +501,7 @@
 .messages-list {
   flex: 1;
   overflow-y: auto;
-  overflow-x: hidden;   /* ← add this */
+  overflow-x: hidden;
   margin-bottom: 1rem;
   display: flex;
   flex-direction: column;
@@ -370,6 +531,72 @@
 
 .messages-list::-webkit-scrollbar-thumb:hover {
   background: #40444b;
+}
+
+/* NOTE: .messages-list-container below looks like it may be a renamed
+   duplicate of .messages-list, used by a newer version of
+   ConversationView.js. Keeping both until confirmed which one is
+   actually rendered — remove the unused one once confirmed. */
+.messages-list-container {
+  flex: 1;
+  overflow-y: auto;
+  margin-bottom: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  min-height: 200px;
+  max-height: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-anchor: none;
+  scroll-behavior: auto;
+}
+
+.messages-list-container .no-messages {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  min-height: 200px;
+  color: #99aab5;
+  font-size: 16px;
+}
+
+.send-message-form {
+  display: flex;
+  gap: 0.5rem;
+  border-top: 1px solid #2c2f33;
+  padding-top: 0.7rem;
+  width: 100%;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+/* ===== PAGINATION UI ===== */
+.messages-loading-older {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px 20px;
+  color: #99aab5;
+  font-size: 13px;
+  align-self: stretch;
+  width: 100%;
+}
+
+.messages-no-more {
+  text-align: center;
+  color: #72767d;
+  font-size: 12px;
+  padding: 12px 20px;
+  letter-spacing: 0.5px;
+  opacity: 0.7;
+  align-self: stretch;
+  width: 100%;
 }
 
 /* ===== SIDEBAR ===== */
@@ -432,158 +659,6 @@
 .conversations-list li.active {
   background: rgba(255, 255, 255, 0.06);
   border-radius: 8px;
-}
-
-/* ===== CONVERSATION ITEM (replaces inline styles previously in ConversationItem.js) ===== */
-.conversation-item {
-  padding: 12px 16px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-  background-color: transparent;
-  position: relative;
-  border: 2px solid transparent;
-  margin-bottom: 2px;
-}
-
-.conversation-item:hover {
-  background-color: rgba(255, 255, 255, 0.05);
-}
-
-.conversation-item--unread {
-  border-color: #00bcd4;
-  box-shadow: 0 0 20px rgba(0, 188, 212, 0.15);
-}
-
-.conversation-item-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 4px;
-}
-
-.conversation-item-name {
-  color: #ffffff;
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: 0.3px;
-}
-
-.conversation-item-name--unread {
-  font-weight: 700;
-}
-
-.conversation-item-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.conversation-item-time {
-  color: #72767d;
-  font-size: 11px;
-}
-
-.conversation-item-badge {
-  background-color: #00bcd4;
-  color: #181a1b;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 12px;
-  min-width: 20px;
-  text-align: center;
-  animation: pulse-badge 1.5s ease-in-out infinite;
-}
-
-.conversation-item-preview {
-  color: #b9bbbe;
-  font-size: 13px;
-  opacity: 0.8;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.conversation-item-preview--unread {
-  color: #ffffff;
-  opacity: 1;
-  font-weight: 500;
-}
-
-.conversation-item-preview-empty {
-  font-size: 10px;
-  color: #72767d;
-  font-style: italic;
-}
-
-@keyframes pulse-badge {
-  0%, 100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.05);
-  }
-}
-/* ===== CONVERSATION VIEW CONTAINER ===== */
-.conversation-view-container {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  width: 100%;
-  overflow: hidden;
-}
-
-.loading-state {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 100%;
-  height: 100%;
-  min-height: 200px;
-  color: #99aab5;
-  font-size: 16px;
-}
-
-.messages-list-container {
-  flex: 1;
-  overflow-y: auto;
-  margin-bottom: 1rem;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.5rem;
-  padding: 0.5rem 0;
-  min-height: 200px;
-  max-height: 100%;
-  width: 100%;
-  box-sizing: border-box;
-  overflow-anchor: none;
-  scroll-behavior: auto;
-}
-
-.messages-list-container .no-messages {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 100%;
-  height: 100%;
-  min-height: 200px;
-  color: #99aab5;
-  font-size: 16px;
-}
-
-.send-message-form {
-  display: flex;
-  gap: 0.5rem;
-  border-top: 1px solid #2c2f33;
-  padding-top: 0.7rem;
-  width: 100%;
-  flex-shrink: 0;
-  box-sizing: border-box;
 }
 
 /* ===== CONVERSATION ITEM ===== */
@@ -672,7 +747,7 @@
   font-style: italic;
 }
 
-/* ===== GLOW ANIMATION ===== */
+/* ===== ANIMATIONS ===== */
 @keyframes pulse-badge {
   0%, 100% {
     transform: scale(1);
@@ -691,276 +766,87 @@
   }
 }
 
-/* ===== MESSAGE INPUT BAR ===== */
-.message-input-bar {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  /* Anchor for the absolute-positioned preview */
-  position: relative;
-}
-
-/* ===== ATTACHMENT PREVIEW (floats above input) ===== */
-.attachment-preview {
-  position: absolute;
-  bottom: 100%;
-  left: 0;
-  margin-bottom: 8px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 12px;
-  background: #2c2f33;
-  border-radius: 12px;
-  border: 1px solid #40444b;
-  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.3);
-  max-width: 400px;
-  z-index: 20;
-}
-
-.attachment-remove {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: #ed4245;
-  color: #fff;
-  border: none;
-  font-size: 20px;
-  line-height: 1;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 0;
-  padding: 0;
-  z-index: 10;
-  transition: background 0.2s;
-}
-
-.attachment-remove:hover:not(:disabled) {
-  background: #c93b3e;
-}
-.attachment-remove:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.attachment-preview-video {
-  max-width: 100%;
-  max-height: 200px;
-  border-radius: 8px;
-  background: #000;
-}
-
-.attachment-preview-audio {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-}
-.attachment-preview-audio-player {
-  flex: 1;
-  height: 40px;
-}
-.attachment-preview-icon {
-  font-size: 32px;
-}
-
-.attachment-preview-name {
+/* ===== TYPING INDICATOR (chat window) ===== */
+.typing-indicator {
   display: flex;
   align-items: center;
   gap: 8px;
-  width: 100%;
-  justify-content: center;
-  font-size: 12px;
-  color: #b9bbbe;
-  max-width: 100%;
-}
-.attachment-preview-name-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 240px;
-}
-.attachment-preview-size {
-  color: #72767d;
-  flex-shrink: 0;
-}
-
-/* ===== PROGRESS ===== */
-.attachment-progress {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  background: #2c2f33;
-  border-radius: 8px;
-  color: #b9bbbe;
+  padding: 0 0 8px 4px;
   font-size: 13px;
+  color: #99aab5;
+  font-style: italic;
+  min-height: 24px;
 }
-.attachment-progress-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid #40444b;
-  border-top-color: #00bcd4;
+
+.typing-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.typing-dot {
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  flex-shrink: 0;
+  background: #99aab5;
+  animation: typing-bounce 1.2s infinite ease-in-out;
 }
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
+
+.typing-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.typing-dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes typing-bounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
   }
 }
-.attachment-progress-text {
-  flex: 1;
-  color: #b9bbbe;
-}
-.attachment-cancel {
-  background: transparent;
-  border: 1px solid #ed4245;
-  color: #ed4245;
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-size: 12px;
-  cursor: pointer;
-  min-width: 0;
-}
-.attachment-cancel:hover {
-  background: #ed4245;
-  color: #fff;
-}
 
-/* ===== ERROR ===== */
-.attachment-error {
-  color: #ed4245;
+.typing-text {
   font-size: 13px;
-  padding: 8px 12px;
-  background: rgba(237, 66, 69, 0.1);
-  border-radius: 8px;
-}
-
-/* ===== MEDIA UPLOAD BUTTON ===== */
-.media-upload {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-.media-upload-input {
-  display: none;
-}
-.media-upload-button {
-  background: transparent;
-  border: none;
-  color: #b9bbbe;
-  font-size: 22px;
-  cursor: pointer;
-  padding: 8px 12px;
-  border-radius: 6px;
-  transition: background-color 0.2s;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.media-upload-button:hover:not(:disabled) {
-  background-color: rgba(255, 255, 255, 0.08);
-  color: #fff;
-}
-.media-upload-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.4;
-}
-
-.media-upload-menu {
-  position: absolute;
-  bottom: 100%;
-  left: 0;
-  margin-bottom: 8px;
-  background: #2f3136;
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  padding: 6px;
-  min-width: 180px;
-  z-index: 1000;
-  border: 1px solid #40444b;
-}
-.media-upload-menu-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
-  background: transparent;
-  border: none;
-  color: #dcddde;
-  width: 100%;
-  text-align: left;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  min-width: 0;
-}
-.media-upload-menu-item:hover {
-  background-color: rgba(255, 255, 255, 0.06);
-}
-/* ===== MESSAGE CAPTION (renders below media in a bubble) ===== */
-.message-caption {
-  margin-top: 6px;
-  font-size: 14px;
-  line-height: 1.4;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
-}
-
-/* ===== AUDIO MESSAGE IMPROVEMENTS ===== */
-.message-audio {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
-  background-color: rgba(0, 0, 0, 0.2);
-  border-radius: 8px;
-  margin-bottom: 4px;
-  min-width: 250px;
-  max-width: 100%;
-}
-
-.message-audio audio {
-  flex: 1;
-  height: 40px;
-  min-width: 0;
-}
-
-.message-audio-icon {
-  font-size: 24px;
-  flex-shrink: 0;
-}
-/* ===== PAGINATION UI ===== */
-
-.messages-loading-older {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 12px 20px;
   color: #99aab5;
-  font-size: 13px;
-  align-self: stretch;
-  width: 100%;
 }
 
-.messages-no-more {
-  text-align: center;
-  color: #72767d;
-  font-size: 12px;
-  padding: 12px 20px;
-  letter-spacing: 0.5px;
-  opacity: 0.7;
-  align-self: stretch;
-  width: 100%;
+/* ===== TYPING INDICATOR (sidebar) ===== */
+.conversation-item--typing {
+  border-color: #43b581 !important;
+  box-shadow: 0 0 20px rgba(67, 181, 129, 0.25) !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.conversation-item-preview--typing {
+  color: #43b581 !important;
+  font-weight: 600;
+  opacity: 1 !important;
+  font-style: italic;
+}
+
+/* Optional: green dot indicator before the "typing…" text */
+.conversation-item-preview--typing::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #43b581;
+  margin-right: 6px;
+  animation: typing-pulse 1.2s infinite;
+}
+
+@keyframes typing-pulse {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
 }

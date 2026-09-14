@@ -1,5 +1,5 @@
 // src/components/ConversationsList.js
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../supabaseClient';
@@ -27,6 +27,23 @@ export default function ConversationsList() {
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
   const isMounted = useRef(true);
+
+  const [typingConversations, setTypingConversations] = useState({});
+
+  const handleTypingChange = useCallback((conversationId, isTyping) => {
+    if (!conversationId) return;
+    setTypingConversations((prev) => {
+      if (isTyping) {
+        // Skip if already true — avoids re-renders on every typing broadcast
+        if (prev[conversationId]) return prev;
+        return { ...prev, [conversationId]: true };
+      }
+      // Skip if not present — avoids re-renders
+      if (!prev[conversationId]) return prev;
+      const { [conversationId]: _, ...rest } = prev;
+      return rest;
+    });
+  }, []);
 
   // ✅ Handle message sent — updates sidebar preview immediately
   const handleMessageSent = useRef((message) => {
@@ -192,7 +209,9 @@ export default function ConversationsList() {
               <ConversationItem
                 conversation={conv}
                 currentUserId={userId}
+                onClick={() => setSelected(conv)}
                 isActive={selected?.id === conv.id}
+                isTyping={!!typingConversations[conv.id]}
               />
             </li>
           ))}
@@ -203,6 +222,7 @@ export default function ConversationsList() {
           conversation={selected}
           currentUserId={userId}
           onMessageSent={handleMessageSent}
+          onTypingChange={handleTypingChange}
         />
       </div>
     </div>

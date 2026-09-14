@@ -15,7 +15,13 @@ function getPreview(conversation) {
   return 'No messages yet';
 }
 
-function ConversationItem({ conversation, currentUserId, onClick, isActive }) {
+function ConversationItem({
+  conversation,
+  currentUserId,
+  onClick,
+  isActive,
+  isTyping = false,
+}) {
   const [otherUser, setOtherUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -32,10 +38,12 @@ function ConversationItem({ conversation, currentUserId, onClick, isActive }) {
   const hasUnread = unreadCount > 0;
 
   // Badge only shows when unread AND this isn't the currently-open
-  // conversation — ConversationView separately keeps the DB count
-  // pinned at 0 while open, but gating on isActive here means the
-  // badge can't flash on even briefly if that update hasn't landed yet.
-  const showBadge = hasUnread && !isActive;
+  // conversation AND the other user isn't typing (typing takes visual
+  // priority in the sidebar).
+  const showBadge = hasUnread && !isActive && !isTyping;
+
+  // Green typing border takes over the unread cyan border while active.
+  const showTyping = isTyping;
 
   const formatTime = (timestamp) => {
     if (!timestamp) return '';
@@ -108,6 +116,29 @@ function ConversationItem({ conversation, currentUserId, onClick, isActive }) {
     }
   };
 
+  // Priority for the border/glow color:
+  //   1. Typing (green) — takes precedence
+  //   2. Unread (cyan)
+  //   3. Neither (transparent)
+  const borderColor = showTyping
+    ? '#43b581'
+    : hasUnread
+    ? '#00bcd4'
+    : 'transparent';
+
+  const boxShadow = showTyping
+    ? '0 0 20px rgba(67, 181, 129, 0.25)'
+    : hasUnread
+    ? '0 0 20px rgba(0, 188, 212, 0.15)'
+    : 'none';
+
+  // Preview text color priority same as border:
+  const previewColor = showTyping
+    ? '#43b581'
+    : hasUnread
+    ? '#ffffff'
+    : '#b9bbbe';
+
   return (
     <div
       onClick={handleClick}
@@ -115,10 +146,11 @@ function ConversationItem({ conversation, currentUserId, onClick, isActive }) {
         padding: '12px 16px',
         borderRadius: '8px',
         cursor: 'pointer',
-        transition: 'background-color 0.15s ease, border-color 0.2s ease, box-shadow 0.2s ease',
+        transition:
+          'background-color 0.15s ease, border-color 0.2s ease, box-shadow 0.2s ease',
         backgroundColor: isActive ? 'rgba(255,255,255,0.06)' : 'transparent',
-        border: hasUnread ? '2px solid #00bcd4' : '2px solid transparent',
-        boxShadow: hasUnread ? '0 0 20px rgba(0, 188, 212, 0.15)' : 'none',
+        border: `2px solid ${borderColor}`,
+        boxShadow,
         marginBottom: '2px',
       }}
       onMouseEnter={(e) => {
@@ -132,73 +164,83 @@ function ConversationItem({ conversation, currentUserId, onClick, isActive }) {
         }
       }}
     >
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '4px'
-      }}>
-        <span style={{
-          color: '#ffffff',
-          fontSize: '15px',
-          fontWeight: hasUnread ? '700' : '600',
-          letterSpacing: '0.3px'
-        }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '4px',
+        }}
+      >
+        <span
+          style={{
+            color: '#ffffff',
+            fontSize: '15px',
+            fontWeight: hasUnread || showTyping ? '700' : '600',
+            letterSpacing: '0.3px',
+          }}
+        >
           {displayName}
         </span>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
-          <span style={{
-            color: '#72767d',
-            fontSize: '11px',
-            fontWeight: '400'
-          }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+          }}
+        >
+          <span
+            style={{
+              color: '#72767d',
+              fontSize: '11px',
+              fontWeight: '400',
+            }}
+          >
             {timeAgo}
           </span>
           {showBadge && (
-            <span style={{
-              backgroundColor: '#00bcd4',
-              color: '#181a1b',
-              fontSize: '11px',
-              fontWeight: '700',
-              padding: '2px 8px',
-              borderRadius: '12px',
-              minWidth: '20px',
-              textAlign: 'center',
-              animation: 'pulse-badge 1.5s ease-in-out infinite',
-            }}>
+            <span
+              style={{
+                backgroundColor: '#00bcd4',
+                color: '#181a1b',
+                fontSize: '11px',
+                fontWeight: '700',
+                padding: '2px 8px',
+                borderRadius: '12px',
+                minWidth: '20px',
+                textAlign: 'center',
+                animation: 'pulse-badge 1.5s ease-in-out infinite',
+              }}
+            >
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           )}
         </div>
       </div>
-      <div style={{
-        color: hasUnread ? '#ffffff' : '#b9bbbe',
-        fontSize: '13px',
-        opacity: hasUnread ? 1 : 0.8,
-        whiteSpace: 'nowrap',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-        fontWeight: hasUnread ? '500' : '400',
-      }}>
-        {lastMessage}
-        {/* FIX: this previously checked !conversation.last_message,
-            which is also true for a media-only message (no text, just
-            a video/audio type) — showing "Sent a video • Start
-            chatting" at the same time, which is contradictory. Now
-            only shows when there's genuinely no message of any kind. */}
-        {lastMessage === 'No messages yet' && (
-          <span style={{
-            fontSize: '10px',
-            color: '#72767d',
-            fontStyle: 'italic'
-          }}>
+      <div
+        style={{
+          color: previewColor,
+          fontSize: '13px',
+          opacity: hasUnread || showTyping ? 1 : 0.8,
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          fontWeight: hasUnread || showTyping ? '500' : '400',
+          fontStyle: showTyping ? 'italic' : 'normal',
+        }}
+      >
+        {showTyping ? 'typing…' : lastMessage}
+        {lastMessage === 'No messages yet' && !showTyping && (
+          <span
+            style={{
+              fontSize: '10px',
+              color: '#72767d',
+              fontStyle: 'italic',
+            }}
+          >
             • Start chatting
           </span>
         )}

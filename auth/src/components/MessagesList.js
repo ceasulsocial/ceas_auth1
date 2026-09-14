@@ -1,16 +1,9 @@
 // src/components/MessagesList.js
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import './ConversationsList.css';
 
-export default function MessagesList({ messages, currentUserId, conversation }) {
-  const endRef = useRef(null);
+export default function MessagesList({ messages, currentUserId, conversation, onMediaLoad }) {
   const [mediaErrors, setMediaErrors] = useState({});
-
-  useEffect(() => {
-    if (messages.length > 0 && endRef.current) {
-      endRef.current.scrollIntoView({ behavior: 'instant' });
-    }
-  }, [messages]);
 
   const isUser1 = conversation && currentUserId === conversation.user1_id;
   const otherReadColumn = isUser1 ? 'read_user2' : 'read_user1';
@@ -36,6 +29,11 @@ export default function MessagesList({ messages, currentUserId, conversation }) 
           <video
             controls
             onError={() => handleMediaError(msg.id)}
+            // Video height isn't known until metadata loads, which can
+            // happen well after the message list first renders. Notify
+            // the parent so it can re-run the scroll-to-bottom once the
+            // real height is known, instead of guessing at a delay.
+            onLoadedMetadata={onMediaLoad}
             preload="metadata"
           >
             <source src={msg.media_url} type="video/mp4" />
@@ -52,6 +50,7 @@ export default function MessagesList({ messages, currentUserId, conversation }) 
           <audio
             controls
             onError={() => handleMediaError(msg.id)}
+            onLoadedMetadata={onMediaLoad}
           >
             <source src={msg.media_url} />
             Your browser does not support audio.
@@ -110,7 +109,6 @@ export default function MessagesList({ messages, currentUserId, conversation }) 
           </div>
         );
       })}
-      <div ref={endRef} />
     </>
   );
 }

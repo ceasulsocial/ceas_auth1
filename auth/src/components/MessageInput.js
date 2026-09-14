@@ -11,6 +11,7 @@ export default function MessageInput({
   uploading,
   error: externalError,
   progress,
+  onTyping,
 }) {
   const [text, setText] = useState('');
   const [attachment, setAttachment] = useState(null);
@@ -91,7 +92,7 @@ export default function MessageInput({
         <div className="attachment-progress">
           <div className="attachment-progress-spinner" />
           <span className="attachment-progress-text">
-            Uploading {attachment?.type || 'file'}… {progress}%
+            Uploading {attachment?.type || 'file'}... {progress}%
           </span>
           <button
             type="button"
@@ -123,13 +124,13 @@ export default function MessageInput({
           onChange={(e) => {
             setText(e.target.value);
             if (localError) clearError();
+            onTyping?.();
           }}
           onKeyDown={handleKeyDown}
           placeholder={
-            attachment ? 'Add a caption (optional)…' : 'Type a message…'
+            attachment ? 'Add a caption (optional)...' : 'Type a message...'
           }
           className="message-input-field"
-          disabled={false}
           aria-label="Message text"
           autoComplete="off"
         />
@@ -139,7 +140,7 @@ export default function MessageInput({
           disabled={!canSend}
           className="message-input-send"
         >
-          {uploading ? 'Uploading…' : 'Send'}
+          {uploading ? 'Uploading...' : 'Send'}
         </button>
       </form>
     </div>
