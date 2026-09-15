@@ -1,13 +1,13 @@
 // src/components/ConversationsList.js
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../supabaseClient';
 import ConversationItem from './ConversationItem';
 import ConversationView from './ConversationView';
+import { useGlobalTyping } from '../hooks/useGlobalTyping';
 import './ConversationsList.css';
 
-// ✅ Mirrors the SQL trigger's COALESCE fallback — never null
 function getPreviewText(message) {
   if (message.content && message.content.trim().length > 0) {
     return message.content;
@@ -28,24 +28,10 @@ export default function ConversationsList() {
   const [loading, setLoading] = useState(true);
   const isMounted = useRef(true);
 
-  const [typingConversations, setTypingConversations] = useState({});
+  // ✅ Global typing state — persists across conversation switches
+  const { typingConversations, notifyTyping, clearTypingFor } =
+    useGlobalTyping(userId);
 
-  const handleTypingChange = useCallback((conversationId, isTyping) => {
-    if (!conversationId) return;
-    setTypingConversations((prev) => {
-      if (isTyping) {
-        // Skip if already true — avoids re-renders on every typing broadcast
-        if (prev[conversationId]) return prev;
-        return { ...prev, [conversationId]: true };
-      }
-      // Skip if not present — avoids re-renders
-      if (!prev[conversationId]) return prev;
-      const { [conversationId]: _, ...rest } = prev;
-      return rest;
-    });
-  }, []);
-
-  // ✅ Handle message sent — updates sidebar preview immediately
   const handleMessageSent = useRef((message) => {
     const preview = getPreviewText(message);
     const timestamp = message.created_at || new Date().toISOString();
@@ -116,7 +102,7 @@ export default function ConversationsList() {
 
     fetchInitial();
 
-    // ── Realtime: conversation updates ──
+    // Realtime: conversation updates
     const conversationChannel = supabase
       .channel('conversations_channel')
       .on(
@@ -148,9 +134,7 @@ export default function ConversationsList() {
       )
       .subscribe();
 
-    // ── Realtime: new message inserts ──
-    // Updates last_message locally for immediate sidebar display.
-    // The DB trigger handles the persisted values.
+    // Realtime: new messages
     const messageChannel = supabase
       .channel('messages_channel')
       .on(
@@ -176,6 +160,11 @@ export default function ConversationsList() {
               (a, b) => new Date(b.updated_at) - new Date(a.updated_at)
             );
           });
+
+          // ✅ Any incoming message = typing has stopped
+          if (payload.new.sender_id !== userId) {
+            clearTypingFor(payload.new.conversation);
+          }
         }
       )
       .subscribe();
@@ -185,7 +174,7 @@ export default function ConversationsList() {
       supabase.removeChannel(conversationChannel);
       supabase.removeChannel(messageChannel);
     };
-  }, [userId, location.state, navigate]);
+  }, [userId, location.state, navigate, clearTypingFor]);
 
   if (loading) {
     return <div className="loading">Loading conversations...</div>;
@@ -222,7 +211,9 @@ export default function ConversationsList() {
           conversation={selected}
           currentUserId={userId}
           onMessageSent={handleMessageSent}
-          onTypingChange={handleTypingChange}
+          notifyTyping={notifyTyping}
+          clearTypingFor={clearTypingFor}
+          isOtherTyping={!!typingConversations[selected?.id]}
         />
       </div>
     </div>

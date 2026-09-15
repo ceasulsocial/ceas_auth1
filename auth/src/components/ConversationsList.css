@@ -850,3 +850,53 @@
     opacity: 1;
   }
 }
+/* ===== DELETED MESSAGES ===== */
+.message--deleted {
+  opacity: 0.6;
+}
+
+.message-deleted-text {
+  font-style: italic;
+  color: #99aab5;
+  font-size: 0.95em;
+}
+
+.message-wrapper.own .message--deleted .message-deleted-text {
+  color: rgba(24, 26, 27, 0.7);
+}
+
+/* ===== DELETE BUTTON ===== */
+.message-delete-btn {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.4);
+  color: #fff;
+  border: none;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease;
+  min-width: 0;
+  padding: 0;
+  z-index: 5;
+}
+
+.message-wrapper:hover .message-delete-btn {
+  opacity: 1;
+}
+
+.message-delete-btn:hover {
+  background: #ed4245;
+}
+
+.message {
+  position: relative;  /* needed for the delete button positioning */
+}

@@ -2,16 +2,24 @@
 import { useState } from 'react';
 import './ConversationsList.css';
 
-export default function MessagesList({ messages, currentUserId, conversation, onMediaLoad }) {
+export default function MessagesList({
+  messages,
+  currentUserId,
+  conversation,
+  onMediaLoad,
+  onDeleteMessage,
+}) {
   const [mediaErrors, setMediaErrors] = useState({});
 
   const isUser1 = conversation && currentUserId === conversation.user1_id;
   const otherReadColumn = isUser1 ? 'read_user2' : 'read_user1';
 
+  // Last NON-DELETED own message (for "Seen")
   let lastOwnMessageId = null;
   for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].sender_id === currentUserId) {
-      lastOwnMessageId = messages[i].id;
+    const m = messages[i];
+    if (m.sender_id === currentUserId && !m.deleted_at) {
+      lastOwnMessageId = m.id;
       break;
     }
   }
@@ -29,10 +37,6 @@ export default function MessagesList({ messages, currentUserId, conversation, on
           <video
             controls
             onError={() => handleMediaError(msg.id)}
-            // Video height isn't known until metadata loads, which can
-            // happen well after the message list first renders. Notify
-            // the parent so it can re-run the scroll-to-bottom once the
-            // real height is known, instead of guessing at a delay.
             onLoadedMetadata={onMediaLoad}
             preload="metadata"
           >
@@ -66,33 +70,49 @@ export default function MessagesList({ messages, currentUserId, conversation, on
     <>
       {messages.map((msg) => {
         const isOwn = msg.sender_id === currentUserId;
+        const isDeleted = !!msg.deleted_at;
+
         const showSeen =
+          !isDeleted &&
           isOwn &&
           conversation &&
           msg.id === lastOwnMessageId &&
           msg[otherReadColumn];
 
-        const hasMedia = msg.media_url && !mediaErrors[msg.id];
-
+        const hasMedia = !isDeleted && msg.media_url && !mediaErrors[msg.id];
         const hasContent =
-          typeof msg.content === 'string' && msg.content.trim().length > 0;
+          !isDeleted &&
+          typeof msg.content === 'string' &&
+          msg.content.trim().length > 0;
 
         return (
           <div
             key={msg.id}
             className={`message-wrapper ${isOwn ? 'own' : 'other'}`}
           >
-            <div className={`message ${isOwn ? 'own' : ''}`}>
-              {hasMedia && renderMedia(msg)}
+            <div
+              className={`message ${isOwn ? 'own' : ''} ${
+                isDeleted ? 'message--deleted' : ''
+              }`}
+            >
+              {isDeleted ? (
+                <span className="message-deleted-text">deleted message</span>
+              ) : (
+                <>
+                  {hasMedia && renderMedia(msg)}
 
-              {hasContent && (
-                <div className={hasMedia ? 'message-caption' : undefined}>
-                  {msg.content}
-                </div>
-              )}
+                  {hasContent && (
+                    <div className={hasMedia ? 'message-caption' : undefined}>
+                      {msg.content}
+                    </div>
+                  )}
 
-              {mediaErrors[msg.id] && msg.media_url && (
-                <div className="message-media-error">Media unavailable</div>
+                  {mediaErrors[msg.id] && msg.media_url && (
+                    <div className="message-media-error">
+                      Media unavailable
+                    </div>
+                  )}
+                </>
               )}
 
               <div className="msg-meta">
@@ -105,6 +125,18 @@ export default function MessagesList({ messages, currentUserId, conversation, on
                 })}
                 {showSeen && <span className="msg-seen"> · Seen</span>}
               </div>
+
+              {isOwn && !isDeleted && onDeleteMessage && (
+                <button
+                  type="button"
+                  className="message-delete-btn"
+                  onClick={() => onDeleteMessage(msg)}
+                  title="Delete message"
+                  aria-label="Delete message"
+                >
+                  ×
+                </button>
+              )}
             </div>
           </div>
         );

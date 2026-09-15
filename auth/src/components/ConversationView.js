@@ -9,60 +9,18 @@ export default function ConversationView({
   conversation,
   currentUserId,
   onMessageSent: onMessageSentProp,
-  onTypingChange,
+  notifyTyping,
+  clearTypingFor,
+  isOtherTyping,
 }) {
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const messagesEndRef = useRef(null);
-  // Tracks message ids currently being marked as read, so an in-flight
-  // update can't be triggered again before it resolves.
   const markingReadRef = useRef(new Set());
   const channelRef = useRef(null);
   const scrollTimerRef = useRef(null);
 
-  // Typing indicator state
-  const [otherTyping, setOtherTyping] = useState(false);
-  const typingTimeoutRef = useRef(null);
-  const lastTypingSentRef = useRef(0);
-
-  // Tuning:
-  // - Send at most one typing broadcast per 3s.
-  // - Assume typing stopped if no event within 5s.
-  const TYPING_SEND_THROTTLE_MS = 3000;
-  const TYPING_STOP_TIMEOUT_MS = 5000;
-
-  // Notifies the parent (ConversationsList) so the sidebar can show
-  // "typing…" on the matching conversation. Only the currently-open
-  // conversation has an active channel, so this only ever fires for it.
-  const notifyTypingChange = useCallback(
-    (isTyping) => {
-      onTypingChange?.(conversation?.id, isTyping);
-    },
-    [conversation?.id, onTypingChange]
-  );
-
-  const setOtherTypingAndNotify = useCallback(
-    (isTyping) => {
-      setOtherTyping(isTyping);
-      notifyTypingChange(isTyping);
-    },
-    [notifyTypingChange]
-  );
-
-  // Throttled typing broadcast
-  const sendTyping = useCallback(() => {
-    const now = Date.now();
-    if (now - lastTypingSentRef.current < TYPING_SEND_THROTTLE_MS) return;
-    lastTypingSentRef.current = now;
-    channelRef.current?.send({
-      type: 'broadcast',
-      event: 'typing',
-      payload: { userId: currentUserId },
-    });
-  }, [currentUserId]);
-
-  // Scroll schedule
   const scheduleScroll = useCallback(() => {
     if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
     scrollTimerRef.current = setTimeout(() => {
@@ -92,6 +50,52 @@ export default function ConversationView({
     },
   });
 
+  // Delete handler
+  const handleDeleteMessage = useCallback(
+    async (message) => {
+      if (!message || !conversation) return;
+      if (message.sender_id !== currentUserId) return;
+
+      const deletedAt = new Date().toISOString();
+
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === message.id
+            ? { ...m, deleted_at: deletedAt, deleted_by: currentUserId }
+            : m
+        )
+      );
+
+      const { error: deleteError } = await supabase
+        .from('messages')
+        .update({
+          deleted_at: deletedAt,
+          deleted_by: currentUserId,
+        })
+        .eq('id', message.id);
+
+      if (deleteError) {
+        console.error('Error deleting message:', deleteError);
+        setError(`Failed to delete message: ${deleteError.message}`);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === message.id
+              ? { ...m, deleted_at: null, deleted_by: null }
+              : m
+          )
+        );
+      }
+    },
+    [conversation, currentUserId]
+  );
+
+  // Typing — forwards to the global hook
+  const sendTyping = useCallback(() => {
+    if (notifyTyping && conversation?.id) {
+      notifyTyping(conversation.id);
+    }
+  }, [notifyTyping, conversation?.id]);
+
   useEffect(() => {
     if (!conversation) return;
 
@@ -115,7 +119,6 @@ export default function ConversationView({
     };
 
     setLoading(true);
-    setOtherTypingAndNotify(false);
     fetchInitialMessages();
 
     if (channelRef.current) {
@@ -138,13 +141,10 @@ export default function ConversationView({
               ? prev
               : [...prev, payload.new]
           );
-                if (payload.new.sender_id !== currentUserId) {
-            if (typingTimeoutRef.current) {
-              clearTimeout(typingTimeoutRef.current);
-              typingTimeoutRef.current = null;
-            }
-            setOtherTypingAndNotify(false);
-          }
+
+          // Any incoming message = other user stopped typing
+          if (clearTypingFor) clearTypingFor(conversation.id);
+
           scheduleScroll();
         }
       )
@@ -175,18 +175,6 @@ export default function ConversationView({
           setMessages((prev) => prev.filter((m) => m.id !== payload.old.id));
         }
       )
-      .on('broadcast', { event: 'typing' }, ({ payload }) => {
-        // Ignore our own broadcast — Realtime echoes broadcasts back to the sender.
-        if (payload.userId === currentUserId) return;
-
-        setOtherTypingAndNotify(true);
-        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-        // No explicit "stopped typing" event is sent — if no further
-        // typing event arrives within the timeout, assume they stopped.
-        typingTimeoutRef.current = setTimeout(() => {
-          setOtherTypingAndNotify(false);
-        }, TYPING_STOP_TIMEOUT_MS);
-      })
       .subscribe();
 
     channelRef.current = channel;
@@ -199,12 +187,9 @@ export default function ConversationView({
       if (scrollTimerRef.current) {
         clearTimeout(scrollTimerRef.current);
       }
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversation?.id, scheduleScroll, currentUserId]);
+  }, [conversation?.id, scheduleScroll, currentUserId, clearTypingFor]);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -297,12 +282,14 @@ export default function ConversationView({
             currentUserId={currentUserId}
             conversation={conversation}
             onMediaLoad={scheduleScroll}
+            onDeleteMessage={handleDeleteMessage}
           />
         )}
         <div ref={messagesEndRef} />
       </div>
 
-      {otherTyping && (
+      {/* Typing indicator — driven by parent, persists across switches */}
+      {isOtherTyping && (
         <div className="typing-indicator">
           <span className="typing-dots">
             <span className="typing-dot" />

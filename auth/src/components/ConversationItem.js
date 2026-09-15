@@ -37,12 +37,7 @@ function ConversationItem({
 
   const hasUnread = unreadCount > 0;
 
-  // Badge only shows when unread AND this isn't the currently-open
-  // conversation AND the other user isn't typing (typing takes visual
-  // priority in the sidebar).
   const showBadge = hasUnread && !isActive && !isTyping;
-
-  // Green typing border takes over the unread cyan border while active.
   const showTyping = isTyping;
 
   const formatTime = (timestamp) => {
@@ -60,7 +55,7 @@ function ConversationItem({
       return date.toLocaleTimeString('en-US', {
         hour: '2-digit',
         minute: '2-digit',
-        hour12: true
+        hour12: true,
       });
     }
     if (diff < 7 * 24 * 60 * 60 * 1000) {
@@ -68,7 +63,7 @@ function ConversationItem({
     }
     return date.toLocaleDateString('en-US', {
       month: 'short',
-      day: 'numeric'
+      day: 'numeric',
     });
   };
 
@@ -98,8 +93,12 @@ function ConversationItem({
     ? 'Loading...'
     : otherUser?.full_name || `User ${otherUserId.slice(0, 8)}`;
 
+  // ✅ lastMessage is defined here...
   const lastMessage = getPreview(conversation);
   const timeAgo = formatTime(conversation.updated_at);
+
+  // ✅ ...so isDeletedPreview must come AFTER it
+  const isDeletedPreview = lastMessage === 'deleted message';
 
   const handleClick = () => {
     if (hasUnread) {
@@ -116,10 +115,6 @@ function ConversationItem({
     }
   };
 
-  // Priority for the border/glow color:
-  //   1. Typing (green) — takes precedence
-  //   2. Unread (cyan)
-  //   3. Neither (transparent)
   const borderColor = showTyping
     ? '#43b581'
     : hasUnread
@@ -132,7 +127,6 @@ function ConversationItem({
     ? '0 0 20px rgba(0, 188, 212, 0.15)'
     : 'none';
 
-  // Preview text color priority same as border:
   const previewColor = showTyping
     ? '#43b581'
     : hasUnread
@@ -219,7 +213,8 @@ function ConversationItem({
       </div>
       <div
         style={{
-          color: previewColor,
+          // ✅ Deleted preview dims
+          color: isDeletedPreview ? '#99aab5' : previewColor,
           fontSize: '13px',
           opacity: hasUnread || showTyping ? 1 : 0.8,
           whiteSpace: 'nowrap',
@@ -229,7 +224,8 @@ function ConversationItem({
           alignItems: 'center',
           gap: '6px',
           fontWeight: hasUnread || showTyping ? '500' : '400',
-          fontStyle: showTyping ? 'italic' : 'normal',
+          // ✅ Deleted preview italicizes
+          fontStyle: showTyping || isDeletedPreview ? 'italic' : 'normal',
         }}
       >
         {showTyping ? 'typing…' : lastMessage}
