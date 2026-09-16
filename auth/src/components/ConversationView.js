@@ -5,6 +5,8 @@ import MessageInput from './MessageInput';
 import { useMessageSender } from '../hooks/useMessageSender';
 import './ConversationsList.css';
 
+const SCROLL_BUTTON_THRESHOLD = 300;
+
 export default function ConversationView({
   conversation,
   currentUserId,
@@ -17,9 +19,14 @@ export default function ConversationView({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const messagesEndRef = useRef(null);
+  const messagesListRef = useRef(null);
   const markingReadRef = useRef(new Set());
   const channelRef = useRef(null);
   const scrollTimerRef = useRef(null);
+
+  // Scroll-to-bottom button state
+  const [showScrollButton, setShowScrollButton] = useState(false);
+  const [unreadWhileScrolledUp, setUnreadWhileScrolledUp] = useState(0);
 
   const scheduleScroll = useCallback(() => {
     if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
@@ -89,12 +96,33 @@ export default function ConversationView({
     [conversation, currentUserId]
   );
 
-  // Typing — forwards to the global hook
   const sendTyping = useCallback(() => {
     if (notifyTyping && conversation?.id) {
       notifyTyping(conversation.id);
     }
   }, [notifyTyping, conversation?.id]);
+
+  // Scroll handler for the messages list
+  const handleMessagesScroll = useCallback(() => {
+    const listEl = messagesListRef.current;
+    if (!listEl) return;
+
+    const distanceFromBottom =
+      listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight;
+
+    const isFarFromBottom = distanceFromBottom > SCROLL_BUTTON_THRESHOLD;
+    setShowScrollButton(isFarFromBottom);
+
+    if (!isFarFromBottom) {
+      setUnreadWhileScrolledUp(0);
+    }
+  }, []);
+
+  const handleScrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    setUnreadWhileScrolledUp(0);
+    setShowScrollButton(false);
+  }, []);
 
   useEffect(() => {
     if (!conversation) return;
@@ -119,6 +147,8 @@ export default function ConversationView({
     };
 
     setLoading(true);
+    setUnreadWhileScrolledUp(0);
+    setShowScrollButton(false);
     fetchInitialMessages();
 
     if (channelRef.current) {
@@ -142,8 +172,22 @@ export default function ConversationView({
               : [...prev, payload.new]
           );
 
-          // Any incoming message = other user stopped typing
           if (clearTypingFor) clearTypingFor(conversation.id);
+
+          // If user is scrolled up, don't yank them down.
+          // Instead, bump the button's unread badge.
+          const listEl = messagesListRef.current;
+          if (listEl) {
+            const distanceFromBottom =
+              listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight;
+
+            if (distanceFromBottom > SCROLL_BUTTON_THRESHOLD) {
+              if (payload.new.sender_id !== currentUserId) {
+                setUnreadWhileScrolledUp((n) => n + 1);
+              }
+              return;
+            }
+          }
 
           scheduleScroll();
         }
@@ -273,7 +317,11 @@ export default function ConversationView({
         </div>
       )}
 
-      <div className="messages-list">
+      <div
+        className="messages-list"
+        ref={messagesListRef}
+        onScroll={handleMessagesScroll}
+      >
         {messages.length === 0 ? (
           <div className="no-messages">No messages yet. Say hello.</div>
         ) : (
@@ -286,9 +334,27 @@ export default function ConversationView({
           />
         )}
         <div ref={messagesEndRef} />
+
+        {showScrollButton && (
+          <button
+            type="button"
+            className={`scroll-to-bottom-btn ${
+              unreadWhileScrolledUp > 0 ? 'scroll-to-bottom-btn--unread' : ''
+            }`}
+            onClick={handleScrollToBottom}
+            aria-label="Scroll to latest messages"
+            title="Scroll to latest"
+          >
+            ↓
+            {unreadWhileScrolledUp > 0 && (
+              <span className="scroll-to-bottom-badge">
+                {unreadWhileScrolledUp > 9 ? '9+' : unreadWhileScrolledUp}
+              </span>
+            )}
+          </button>
+        )}
       </div>
 
-      {/* Typing indicator — driven by parent, persists across switches */}
       {isOtherTyping && (
         <div className="typing-indicator">
           <span className="typing-dots">
