@@ -1,6 +1,27 @@
 // src/components/MessagesList.js
-import { useState } from 'react';
+import { useState, Fragment } from 'react';
 import './ConversationsList.css';
+
+function linkify(text) {
+  if (typeof text !== 'string') return text;
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const parts = text.split(urlRegex);
+  return parts.map((part, i) =>
+    urlRegex.test(part) ? (
+      <a
+        key={i}
+        href={part}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="message-link"
+      >
+        {part}
+      </a>
+    ) : (
+      part
+    )
+  );
+}
 
 export default function MessagesList({
   messages,
@@ -8,13 +29,14 @@ export default function MessagesList({
   conversation,
   onMediaLoad,
   onDeleteMessage,
+  newMessageDividerId,
 }) {
   const [mediaErrors, setMediaErrors] = useState({});
+  const [copiedId, setCopiedId] = useState(null);
 
   const isUser1 = conversation && currentUserId === conversation.user1_id;
   const otherReadColumn = isUser1 ? 'read_user2' : 'read_user1';
 
-  // Last NON-DELETED own message (for "Seen")
   let lastOwnMessageId = null;
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i];
@@ -26,6 +48,20 @@ export default function MessagesList({
 
   const handleMediaError = (messageId) => {
     setMediaErrors((prev) => ({ ...prev, [messageId]: true }));
+  };
+
+  const handleCopy = async (msg) => {
+    const textToCopy = msg.content || '';
+    if (!textToCopy) return;
+    try {
+      await navigator.clipboard.writeText(textToCopy);
+      setCopiedId(msg.id);
+      setTimeout(() => {
+        setCopiedId((prev) => (prev === msg.id ? null : prev));
+      }, 1200);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
   };
 
   const renderMedia = (msg) => {
@@ -86,59 +122,80 @@ export default function MessagesList({
           msg.content.trim().length > 0;
 
         return (
-          <div
-            key={msg.id}
-            className={`message-wrapper ${isOwn ? 'own' : 'other'}`}
-          >
-            <div
-              className={`message ${isOwn ? 'own' : ''} ${
-                isDeleted ? 'message--deleted' : ''
-              }`}
-            >
-              {isDeleted ? (
-                <span className="message-deleted-text">deleted message</span>
-              ) : (
-                <>
-                  {hasMedia && renderMedia(msg)}
-
-                  {hasContent && (
-                    <div className={hasMedia ? 'message-caption' : undefined}>
-                      {msg.content}
-                    </div>
-                  )}
-
-                  {mediaErrors[msg.id] && msg.media_url && (
-                    <div className="message-media-error">
-                      Media unavailable
-                    </div>
-                  )}
-                </>
-              )}
-
-              <div className="msg-meta">
-                {new Date(msg.created_at).toLocaleString('en-US', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  month: 'short',
-                  day: 'numeric',
-                  hour12: true,
-                })}
-                {showSeen && <span className="msg-seen"> · Seen</span>}
+          <Fragment key={msg.id}>
+            {newMessageDividerId === msg.id && (
+              <div className="new-messages-divider">
+                <span>New messages</span>
               </div>
+            )}
 
-              {isOwn && !isDeleted && onDeleteMessage && (
-                <button
-                  type="button"
-                  className="message-delete-btn"
-                  onClick={() => onDeleteMessage(msg)}
-                  title="Delete message"
-                  aria-label="Delete message"
-                >
-                  ×
-                </button>
-              )}
+            <div
+              className={`message-wrapper ${isOwn ? 'own' : 'other'}`}
+            >
+              <div
+                className={`message ${isOwn ? 'own' : ''} ${
+                  isDeleted ? 'message--deleted' : ''
+                }`}
+              >
+                {isDeleted ? (
+                  <span className="message-deleted-text">deleted message</span>
+                ) : (
+                  <>
+                    {hasMedia && renderMedia(msg)}
+
+                    {hasContent && (
+                      <div
+                        className={hasMedia ? 'message-caption' : undefined}
+                      >
+                        {linkify(msg.content)}
+                      </div>
+                    )}
+
+                    {mediaErrors[msg.id] && msg.media_url && (
+                      <div className="message-media-error">
+                        Media unavailable
+                      </div>
+                    )}
+                  </>
+                )}
+
+                <div className="msg-meta">
+                  {new Date(msg.created_at).toLocaleString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    month: 'short',
+                    day: 'numeric',
+                    hour12: true,
+                  })}
+                  {showSeen && <span className="msg-seen"> · Seen</span>}
+                </div>
+
+                {!isDeleted && hasContent && (
+                  <button
+                    type="button"
+                    className="message-copy-btn"
+                    onClick={() => handleCopy(msg)}
+                    title="Copy message"
+                    aria-label="Copy message"
+                  >
+                    {copiedId === msg.id ? '✓' : '⎘'}
+                  </button>
+                )}
+
+                {isOwn && !isDeleted && onDeleteMessage && (
+                  <button
+                    type="button"
+                    className="message-delete-btn"
+                    onClick={() => onDeleteMessage(msg)}
+                    title="Delete message"
+                    aria-label="Delete message"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
+          </Fragment>
         );
       })}
     </>

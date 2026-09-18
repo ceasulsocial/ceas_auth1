@@ -28,7 +28,7 @@ export default function ConversationsList() {
   const [loading, setLoading] = useState(true);
   const isMounted = useRef(true);
 
-  // ✅ Global typing state — persists across conversation switches
+  // Global typing state — persists across conversation switches
   const { typingConversations, notifyTyping, clearTypingFor } =
     useGlobalTyping(userId);
 
@@ -161,7 +161,7 @@ export default function ConversationsList() {
             );
           });
 
-          // ✅ Any incoming message = typing has stopped
+          // Any incoming message = typing has stopped
           if (payload.new.sender_id !== userId) {
             clearTypingFor(payload.new.conversation);
           }
@@ -175,6 +175,29 @@ export default function ConversationsList() {
       supabase.removeChannel(messageChannel);
     };
   }, [userId, location.state, navigate, clearTypingFor]);
+
+  // ✅ Tab title with total unread count
+  useEffect(() => {
+    if (!userId) {
+      document.title = 'Ceasul Social';
+      return;
+    }
+
+    const totalUnread = conversations.reduce((sum, conv) => {
+      const isUser1 = userId === conv.user1_id;
+      const count = isUser1
+        ? (conv.unread_count_user1 || 0)
+        : (conv.unread_count_user2 || 0);
+      return sum + count;
+    }, 0);
+
+    document.title =
+      totalUnread > 0 ? `(${totalUnread}) Ceasul Social` : 'Ceasul Social';
+
+    return () => {
+      document.title = 'Ceasul Social';
+    };
+  }, [conversations, userId]);
 
   if (loading) {
     return <div className="loading">Loading conversations...</div>;

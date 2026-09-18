@@ -996,3 +996,87 @@
   width: 100%;
   flex-shrink: 0;
 }
+/* ===== MESSAGE LINKS ===== */
+.message-link {
+  color: #00bcd4;
+  text-decoration: underline;
+  word-break: break-all;
+}
+
+.message-link:hover {
+  color: #4dd0e1;
+}
+
+/* On own bubbles, use a dark link to stay readable */
+.message.own .message-link {
+  color: #0d47a1;
+  font-weight: 600;
+}
+
+.message.own .message-link:hover {
+  color: #1565c0;
+}
+
+/* ===== COPY BUTTON ===== */
+.message-copy-btn {
+  position: absolute;
+  top: 4px;
+  right: 30px; /* sits next to the delete button */
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  border: none;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease;
+  min-width: 0;
+  padding: 0;
+  z-index: 5;
+}
+
+.message-wrapper:hover .message-copy-btn {
+  opacity: 1;
+}
+
+.message-copy-btn:hover {
+  background: #00bcd4;
+}
+
+/* When the copy button is the only hover button (no delete) */
+.message-copy-btn:only-of-type {
+  right: 6px;
+}
+/* ===== NEW MESSAGES DIVIDER ===== */
+.new-messages-divider {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  margin: 12px 0;
+  color: #00bcd4;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.new-messages-divider::before,
+.new-messages-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #00bcd4;
+  opacity: 0.35;
+}
+
+.new-messages-divider span {
+  padding: 0 12px;
+  white-space: nowrap;
+}

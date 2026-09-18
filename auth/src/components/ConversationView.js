@@ -16,7 +16,7 @@ export default function ConversationView({
   clearTypingFor,
   isOtherTyping,
 }) {
-  // Primitive values — safe for effect deps
+  // primitive values, safe for effect deps
   const conversationId = conversation?.id;
   const user1Id = conversation?.user1_id;
   const isUser1 = currentUserId === user1Id;
@@ -32,6 +32,7 @@ export default function ConversationView({
 
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [unreadWhileScrolledUp, setUnreadWhileScrolledUp] = useState(0);
+  const [newMessageDividerId, setNewMessageDividerId] = useState(null);
 
   const messagesEndRef = useRef(null);
   const messagesListRef = useRef(null);
@@ -42,18 +43,15 @@ export default function ConversationView({
   const scrollIntentRef = useRef('none'); // 'none' | 'preserve'
   const hasDoneInitialScrollRef = useRef(false);
 
-  // ── scheduleScroll ──
-  // Only scrolls if we're allowed to. `force = true` bypasses the
+  // only scrolls if we're allowed to. `force = true` bypasses the
   // near-bottom check (used for initial load and own sends).
   const scheduleScroll = useCallback((force = false) => {
     if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
     scrollTimerRef.current = setTimeout(() => {
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          // Guard 1: mid-prepend
           if (scrollIntentRef.current === 'preserve') return;
 
-          // Guard 2: user is reading history (unless forced)
           if (!force) {
             const listEl = messagesListRef.current;
             if (listEl) {
@@ -69,12 +67,7 @@ export default function ConversationView({
     }, 50);
   }, []);
 
-  // ── Media load handler ──
-  // Videos/audio fire onLoadedMetadata asynchronously. During a prepend,
-  // or when the user is scrolled up, we don't want those events to yank
-  // the user to the bottom.
   const handleMediaLoad = useCallback(() => {
-    // Guard: mid-prepend
     if (scrollIntentRef.current === 'preserve') return;
 
     const listEl = messagesListRef.current;
@@ -83,13 +76,12 @@ export default function ConversationView({
     const distanceFromBottom =
       listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight;
 
-    // Only attempt scroll if user is well inside the bottom zone
     if (distanceFromBottom > 500) return;
 
     scheduleScroll();
   }, [scheduleScroll]);
 
-  // ── Send hook ──
+  // send hook
   const {
     send,
     cancel,
@@ -100,7 +92,6 @@ export default function ConversationView({
     conversationId,
     currentUserId,
     onMessageSent: (msg) => {
-      // Reset prepend intent — a real new message is happening now
       scrollIntentRef.current = 'none';
       setMessages((prev) =>
         prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]
@@ -111,7 +102,6 @@ export default function ConversationView({
     },
   });
 
-  // ── Delete handler ──
   const handleDeleteMessage = useCallback(
     async (message) => {
       if (!message || !conversationId) return;
@@ -147,14 +137,14 @@ export default function ConversationView({
     [conversationId, currentUserId]
   );
 
-  // ── Typing forwarding ──
+  // typing forwarding
   const sendTyping = useCallback(() => {
     if (notifyTyping && conversationId) {
       notifyTyping(conversationId);
     }
   }, [notifyTyping, conversationId]);
 
-  // ── Initial fetch ──
+
   const fetchInitialMessages = useCallback(async () => {
     if (!conversationId) return;
 
@@ -184,7 +174,6 @@ export default function ConversationView({
     }
   }, [conversationId]);
 
-  // ── Load older ──
   const loadOlder = useCallback(async () => {
     if (!conversationId || loadingOlderRef.current || !hasMoreOlder) return;
     if (messages.length === 0) return;
@@ -244,9 +233,8 @@ export default function ConversationView({
             }
             finishLoadingOlder();
 
-            // Keep intent as 'preserve' for a short window so late
-            // media-loaded events from the newly-prepended block don't
-            // trigger a scroll-to-bottom.
+            // keep 'preserve' active briefly to catch late media-load
+            // events from the newly-prepended block
             setTimeout(() => {
               if (scrollIntentRef.current === 'preserve') {
                 scrollIntentRef.current = 'none';
@@ -264,13 +252,11 @@ export default function ConversationView({
     }
   }, [conversationId, messages, hasMoreOlder]);
 
-  // ── Scroll listener ──
+  // scroll listener
   const handleScroll = useCallback(() => {
     const listEl = messagesListRef.current;
     if (!listEl) return;
 
-    // Don't trigger loadOlder while mid-prepend (prevents re-entrant loads
-    // from our own programmatic scrollTop assignment)
     if (scrollIntentRef.current === 'preserve') return;
 
     if (listEl.scrollTop < 200) {
@@ -284,6 +270,7 @@ export default function ConversationView({
 
     if (!isFarFromBottom) {
       setUnreadWhileScrolledUp(0);
+      setNewMessageDividerId((prev) => (prev ? null : prev));
     }
   }, [loadOlder]);
 
@@ -291,20 +278,21 @@ export default function ConversationView({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     setUnreadWhileScrolledUp(0);
     setShowScrollButton(false);
+    setNewMessageDividerId(null);
   }, []);
 
-  // ── Reset on conversation change ──
+  // reset on conversation change
   useEffect(() => {
     scrollIntentRef.current = 'none';
     hasDoneInitialScrollRef.current = false;
     setHasMoreOlder(true);
     setUnreadWhileScrolledUp(0);
     setShowScrollButton(false);
+    setNewMessageDividerId(null);
     setMessages([]);
     markingReadRef.current = new Set();
   }, [conversationId]);
 
-  // ── Main effect: initial fetch + realtime ──
   useEffect(() => {
     if (!conversationId) return;
 
@@ -326,7 +314,6 @@ export default function ConversationView({
           filter: `conversation=eq.${conversationId}`,
         },
         (payload) => {
-          // A real new message resets prepend intent
           scrollIntentRef.current = 'none';
 
           setMessages((prev) =>
@@ -338,12 +325,29 @@ export default function ConversationView({
           if (clearTypingFor) clearTypingFor(conversationId);
 
           const listEl = messagesListRef.current;
-          const isNearBottom = listEl
-            ? listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight < 200
-            : true;
+          const distanceFromBottom = listEl
+            ? listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight
+            : null;
+          const isNearBottom =
+            distanceFromBottom !== null
+              ? distanceFromBottom < SCROLL_BUTTON_THRESHOLD
+              : true;
+
+          // Temporary diagnostic log — remove once this is confirmed
+          // working. Shows exactly why the divider is or isn't set.
+          console.log('[new-message-divider]', {
+            distanceFromBottom,
+            isNearBottom,
+            senderId: payload.new.sender_id,
+            currentUserId,
+            isOwnMessage: payload.new.sender_id === currentUserId,
+            willSetDivider:
+              !isNearBottom && payload.new.sender_id !== currentUserId,
+          });
 
           if (!isNearBottom && payload.new.sender_id !== currentUserId) {
             setUnreadWhileScrolledUp((n) => n + 1);
+            setNewMessageDividerId((prev) => prev ?? payload.new.id);
           }
         }
       )
@@ -486,7 +490,7 @@ export default function ConversationView({
         {loadingOlder && (
           <div className="messages-loading-older">
             <div className="attachment-progress-spinner" />
-            <span>Loading older messages…</span>
+            <span>Loading older messages...</span>
           </div>
         )}
 
@@ -505,6 +509,7 @@ export default function ConversationView({
             conversation={conversation}
             onMediaLoad={handleMediaLoad}
             onDeleteMessage={handleDeleteMessage}
+            newMessageDividerId={newMessageDividerId}
           />
         )}
         <div ref={messagesEndRef} />
@@ -536,7 +541,7 @@ export default function ConversationView({
             <span className="typing-dot" />
             <span className="typing-dot" />
           </span>
-          <span className="typing-text">typing…</span>
+          <span className="typing-text">typing...</span>
         </div>
       )}
 
