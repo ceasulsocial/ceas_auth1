@@ -1,18 +1,28 @@
 // src/components/MessageInput.js
-import { useState, useRef, useEffect, useCallback } from 'react';
+import {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  forwardRef,
+  useImperativeHandle,
+} from 'react';
 import MediaUpload from './MediaUpload';
 import AttachmentPreview from './AttachmentPreview';
 import { validateMediaFile } from '../utils/mediaValidation';
 import './ConversationsList.css';
 
-export default function MessageInput({
-  onSubmit,
-  onCancel,
-  uploading,
-  error: externalError,
-  progress,
-  onTyping,
-}) {
+const MessageInput = forwardRef(function MessageInput(
+  {
+    onSubmit,
+    onCancel,
+    uploading,
+    error: externalError,
+    progress,
+    onTyping,
+  },
+  ref
+) {
   const [text, setText] = useState('');
   const [attachment, setAttachment] = useState(null);
   const [localError, setLocalError] = useState(null);
@@ -40,6 +50,15 @@ export default function MessageInput({
       inputRef.current?.focus();
     },
     [clearError]
+  );
+
+  // ✅ Expose handleFileSelected to the parent via ref
+  useImperativeHandle(
+    ref,
+    () => ({
+      addFile: (file, type) => handleFileSelected(file, type),
+    }),
+    [handleFileSelected]
   );
 
   const handleRemoveAttachment = useCallback(() => {
@@ -145,4 +164,6 @@ export default function MessageInput({
       </form>
     </div>
   );
-}
+});
+
+export default MessageInput;

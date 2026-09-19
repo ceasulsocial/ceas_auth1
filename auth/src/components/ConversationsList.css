@@ -1049,15 +1049,17 @@
   background: #00bcd4;
 }
 
-/* When the copy button is the only hover button (no delete) */
+/* when the copy button is the only hover button (no delete) */
 .message-copy-btn:only-of-type {
   right: 6px;
 }
 /* ===== NEW MESSAGES DIVIDER ===== */
+
 .new-messages-divider {
   display: flex;
   align-items: center;
   width: 100%;
+  align-self: stretch;
   margin: 12px 0;
   color: #00bcd4;
   font-size: 11px;
@@ -1065,6 +1067,7 @@
   letter-spacing: 1.2px;
   text-transform: uppercase;
   flex-shrink: 0;
+  min-height: 20px;
 }
 
 .new-messages-divider::before,
@@ -1079,4 +1082,56 @@
 .new-messages-divider span {
   padding: 0 12px;
   white-space: nowrap;
+}
+
+/* ===== DRAG AND DROP ===== */
+.messages-list {
+  position: relative; /* already set, but confirm */
+}
+
+/* Visual feedback while dragging */
+.messages-list--dragging {
+  background: rgba(0, 188, 212, 0.04);
+}
+
+/* Full-area drop overlay */
+.drop-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 188, 212, 0.08);
+  border: 3px dashed #00bcd4;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none; /* must not block the drop event */
+  z-index: 100;
+  animation: drop-pulse 1.2s ease-in-out infinite;
+}
+
+.drop-overlay-content {
+  text-align: center;
+  color: #00bcd4;
+  font-weight: 600;
+}
+
+.drop-overlay-icon {
+  font-size: 48px;
+  margin-bottom: 8px;
+}
+
+.drop-overlay-text {
+  font-size: 16px;
+  letter-spacing: 0.5px;
+}
+
+@keyframes drop-pulse {
+  0%, 100% {
+    border-color: rgba(0, 188, 212, 0.5);
+    background: rgba(0, 188, 212, 0.06);
+  }
+  50% {
+    border-color: #00bcd4;
+    background: rgba(0, 188, 212, 0.12);
+  }
 }

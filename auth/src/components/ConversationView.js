@@ -16,7 +16,6 @@ export default function ConversationView({
   clearTypingFor,
   isOtherTyping,
 }) {
-  // primitive values, safe for effect deps
   const conversationId = conversation?.id;
   const user1Id = conversation?.user1_id;
   const isUser1 = currentUserId === user1Id;
@@ -40,11 +39,15 @@ export default function ConversationView({
   const channelRef = useRef(null);
   const scrollTimerRef = useRef(null);
   const loadingOlderRef = useRef(false);
-  const scrollIntentRef = useRef('none'); // 'none' | 'preserve'
+  const scrollIntentRef = useRef('none');
   const hasDoneInitialScrollRef = useRef(false);
+  const notificationsRequestedRef = useRef(false);
 
-  // only scrolls if we're allowed to. `force = true` bypasses the
-  // near-bottom check (used for initial load and own sends).
+  // Message input ref for exposing addFile method
+  const messageInputRef = useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragCounterRef = useRef(0);
+
   const scheduleScroll = useCallback((force = false) => {
     if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
     scrollTimerRef.current = setTimeout(() => {
@@ -67,6 +70,54 @@ export default function ConversationView({
     }, 50);
   }, []);
 
+  // ── Drag-and-drop ──
+  const handleDragEnter = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!e.dataTransfer?.types?.includes('Files')) return;
+
+    dragCounterRef.current += 1;
+    if (dragCounterRef.current === 1) {
+      setIsDragging(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    dragCounterRef.current -= 1;
+    if (dragCounterRef.current <= 0) {
+      dragCounterRef.current = 0;
+      setIsDragging(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'copy';
+  }, []);
+
+  const handleDrop = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    dragCounterRef.current = 0;
+    setIsDragging(false);
+
+    const file = e.dataTransfer?.files?.[0];
+    if (!file) return;
+
+    let type = null;
+    if (file.type.startsWith('video/')) type = 'video';
+    else if (file.type.startsWith('audio/')) type = 'audio';
+    else return;
+
+    messageInputRef.current?.addFile(file, type);
+  }, []);
+
   const handleMediaLoad = useCallback(() => {
     if (scrollIntentRef.current === 'preserve') return;
 
@@ -81,7 +132,57 @@ export default function ConversationView({
     scheduleScroll();
   }, [scheduleScroll]);
 
-  // send hook
+  // ── Browser notification ──
+  const maybeNotify = useCallback(
+    (message) => {
+      if (message.sender_id === currentUserId) return;
+      if (!document.hidden) return;
+      if (!('Notification' in window)) return;
+      if (Notification.permission !== 'granted') return;
+
+      let body;
+      if (message.content && message.content.trim().length > 0) {
+        body =
+          message.content.length > 80
+            ? `${message.content.slice(0, 80)}…`
+            : message.content;
+      } else if (message.media_type === 'video') {
+        body = '📹 Sent a video';
+      } else if (message.media_type === 'audio') {
+        body = '🎵 Sent an audio file';
+      } else {
+        body = 'New message';
+      }
+
+      try {
+        const notification = new Notification('Ceasul Social', {
+          body,
+          icon: '/favicon.ico',
+          tag: `conversation-${message.conversation}`,
+          renotify: true,
+        });
+
+        notification.onclick = () => {
+          window.focus();
+          notification.close();
+        };
+      } catch (err) {
+        console.error('Notification error:', err);
+      }
+    },
+    [currentUserId]
+  );
+
+  useEffect(() => {
+    if (notificationsRequestedRef.current) return;
+    notificationsRequestedRef.current = true;
+
+    if (!('Notification' in window)) return;
+    if (Notification.permission !== 'default') return;
+
+    Notification.requestPermission().catch(() => {});
+  }, []);
+
   const {
     send,
     cancel,
@@ -99,6 +200,10 @@ export default function ConversationView({
       onMessageSentProp?.(msg);
       hasDoneInitialScrollRef.current = true;
       scheduleScroll(true);
+
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission().catch(() => {});
+      }
     },
   });
 
@@ -137,13 +242,11 @@ export default function ConversationView({
     [conversationId, currentUserId]
   );
 
-  // typing forwarding
   const sendTyping = useCallback(() => {
     if (notifyTyping && conversationId) {
       notifyTyping(conversationId);
     }
   }, [notifyTyping, conversationId]);
-
 
   const fetchInitialMessages = useCallback(async () => {
     if (!conversationId) return;
@@ -233,8 +336,6 @@ export default function ConversationView({
             }
             finishLoadingOlder();
 
-            // keep 'preserve' active briefly to catch late media-load
-            // events from the newly-prepended block
             setTimeout(() => {
               if (scrollIntentRef.current === 'preserve') {
                 scrollIntentRef.current = 'none';
@@ -252,7 +353,6 @@ export default function ConversationView({
     }
   }, [conversationId, messages, hasMoreOlder]);
 
-  // scroll listener
   const handleScroll = useCallback(() => {
     const listEl = messagesListRef.current;
     if (!listEl) return;
@@ -281,7 +381,6 @@ export default function ConversationView({
     setNewMessageDividerId(null);
   }, []);
 
-  // reset on conversation change
   useEffect(() => {
     scrollIntentRef.current = 'none';
     hasDoneInitialScrollRef.current = false;
@@ -324,6 +423,8 @@ export default function ConversationView({
 
           if (clearTypingFor) clearTypingFor(conversationId);
 
+          maybeNotify(payload.new);
+
           const listEl = messagesListRef.current;
           const distanceFromBottom = listEl
             ? listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight
@@ -332,18 +433,6 @@ export default function ConversationView({
             distanceFromBottom !== null
               ? distanceFromBottom < SCROLL_BUTTON_THRESHOLD
               : true;
-
-          // Temporary diagnostic log — remove once this is confirmed
-          // working. Shows exactly why the divider is or isn't set.
-          console.log('[new-message-divider]', {
-            distanceFromBottom,
-            isNearBottom,
-            senderId: payload.new.sender_id,
-            currentUserId,
-            isOwnMessage: payload.new.sender_id === currentUserId,
-            willSetDivider:
-              !isNearBottom && payload.new.sender_id !== currentUserId,
-          });
 
           if (!isNearBottom && payload.new.sender_id !== currentUserId) {
             setUnreadWhileScrolledUp((n) => n + 1);
@@ -391,9 +480,15 @@ export default function ConversationView({
         clearTimeout(scrollTimerRef.current);
       }
     };
-  }, [conversationId, fetchInitialMessages, scheduleScroll, currentUserId, clearTypingFor]);
+  }, [
+    conversationId,
+    fetchInitialMessages,
+    scheduleScroll,
+    currentUserId,
+    clearTypingFor,
+    maybeNotify,
+  ]);
 
-  // ── Unified scroll effect ──
   useEffect(() => {
     if (messages.length === 0) return;
     const listEl = messagesListRef.current;
@@ -415,7 +510,6 @@ export default function ConversationView({
     }
   }, [messages, scheduleScroll]);
 
-  // ── Read receipts ──
   useEffect(() => {
     if (!conversationId || messages.length === 0) return;
 
@@ -444,7 +538,6 @@ export default function ConversationView({
       });
   }, [messages, conversationId, currentUserId, myReadColumn]);
 
-  // ── Unread reset ──
   useEffect(() => {
     if (!conversationId || currentUnread === 0) return;
 
@@ -483,10 +576,23 @@ export default function ConversationView({
       )}
 
       <div
-        className="messages-list"
+        className={`messages-list ${isDragging ? 'messages-list--dragging' : ''}`}
         ref={messagesListRef}
         onScroll={handleScroll}
+        onDragEnter={handleDragEnter}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
       >
+        {isDragging && (
+          <div className="drop-overlay">
+            <div className="drop-overlay-content">
+              <div className="drop-overlay-icon">📎</div>
+              <div className="drop-overlay-text">Drop video or audio here</div>
+            </div>
+          </div>
+        )}
+
         {loadingOlder && (
           <div className="messages-loading-older">
             <div className="attachment-progress-spinner" />
@@ -547,6 +653,7 @@ export default function ConversationView({
 
       <div className="send-message-form">
         <MessageInput
+          ref={messageInputRef}
           onSubmit={send}
           onCancel={cancel}
           uploading={uploading}
