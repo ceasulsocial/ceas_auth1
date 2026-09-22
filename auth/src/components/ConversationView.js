@@ -16,6 +16,7 @@ export default function ConversationView({
   clearTypingFor,
   isOtherTyping,
 }) {
+  // primitive values, safe for effect deps
   const conversationId = conversation?.id;
   const user1Id = conversation?.user1_id;
   const isUser1 = currentUserId === user1Id;
@@ -74,19 +75,14 @@ export default function ConversationView({
   const handleDragEnter = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
-
     if (!e.dataTransfer?.types?.includes('Files')) return;
-
     dragCounterRef.current += 1;
-    if (dragCounterRef.current === 1) {
-      setIsDragging(true);
-    }
+    if (dragCounterRef.current === 1) setIsDragging(true);
   }, []);
 
   const handleDragLeave = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
-
     dragCounterRef.current -= 1;
     if (dragCounterRef.current <= 0) {
       dragCounterRef.current = 0;
@@ -103,7 +99,6 @@ export default function ConversationView({
   const handleDrop = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
-
     dragCounterRef.current = 0;
     setIsDragging(false);
 
@@ -120,15 +115,11 @@ export default function ConversationView({
 
   const handleMediaLoad = useCallback(() => {
     if (scrollIntentRef.current === 'preserve') return;
-
     const listEl = messagesListRef.current;
     if (!listEl) return;
-
     const distanceFromBottom =
       listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight;
-
     if (distanceFromBottom > 500) return;
-
     scheduleScroll();
   }, [scheduleScroll]);
 
@@ -161,7 +152,6 @@ export default function ConversationView({
           tag: `conversation-${message.conversation}`,
           renotify: true,
         });
-
         notification.onclick = () => {
           window.focus();
           notification.close();
@@ -176,19 +166,21 @@ export default function ConversationView({
   useEffect(() => {
     if (notificationsRequestedRef.current) return;
     notificationsRequestedRef.current = true;
-
     if (!('Notification' in window)) return;
     if (Notification.permission !== 'default') return;
-
     Notification.requestPermission().catch(() => {});
   }, []);
 
+  // ── Send hook ──
   const {
     send,
     cancel,
     uploading,
     error: sendError,
     progress,
+    pendingMessages,
+    retry: retryMessage,
+    dismiss: dismissMessage,
   } = useMessageSender({
     conversationId,
     currentUserId,
@@ -304,7 +296,7 @@ export default function ConversationView({
         .eq('conversation', conversationId)
         .or(
           `created_at.lt.${oldest.created_at},` +
-          `and(created_at.eq.${oldest.created_at},id.lt.${oldest.id})`
+            `and(created_at.eq.${oldest.created_at},id.lt.${oldest.id})`
         )
         .order('created_at', { ascending: false })
         .order('id', { ascending: false })
@@ -381,6 +373,7 @@ export default function ConversationView({
     setNewMessageDividerId(null);
   }, []);
 
+  // reset on conversation change
   useEffect(() => {
     scrollIntentRef.current = 'none';
     hasDoneInitialScrollRef.current = false;
@@ -606,15 +599,17 @@ export default function ConversationView({
           </div>
         )}
 
-        {messages.length === 0 ? (
+        {messages.length === 0 && pendingMessages.length === 0 ? (
           <div className="no-messages">No messages yet. Say hello.</div>
         ) : (
           <MessagesList
-            messages={messages}
+            messages={[...messages, ...pendingMessages]}
             currentUserId={currentUserId}
             conversation={conversation}
             onMediaLoad={handleMediaLoad}
             onDeleteMessage={handleDeleteMessage}
+            onRetryMessage={retryMessage}
+            onDismissMessage={dismissMessage}
             newMessageDividerId={newMessageDividerId}
           />
         )}

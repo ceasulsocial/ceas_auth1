@@ -29,6 +29,8 @@ export default function MessagesList({
   conversation,
   onMediaLoad,
   onDeleteMessage,
+  onRetryMessage,
+  onDismissMessage,
   newMessageDividerId,
 }) {
   const [mediaErrors, setMediaErrors] = useState({});
@@ -37,10 +39,16 @@ export default function MessagesList({
   const isUser1 = conversation && currentUserId === conversation.user1_id;
   const otherReadColumn = isUser1 ? 'read_user2' : 'read_user1';
 
+  // Last NON-DELETED, non-pending own message (for "Seen")
   let lastOwnMessageId = null;
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i];
-    if (m.sender_id === currentUserId && !m.deleted_at) {
+    if (
+      m.sender_id === currentUserId &&
+      !m.deleted_at &&
+      !m._pending &&
+      !m._failed
+    ) {
       lastOwnMessageId = m.id;
       break;
     }
@@ -65,6 +73,24 @@ export default function MessagesList({
   };
 
   const renderMedia = (msg) => {
+    if (msg._pending && msg._attachment) {
+      // Pending media — show local preview
+      const file = msg._attachment.file;
+      const url = URL.createObjectURL(file);
+      return (
+        <div className="message-media">
+          {msg._attachment.type === 'video' ? (
+            <video controls src={url} className="message-media-preview" />
+          ) : (
+            <div className="message-audio">
+              <span className="message-audio-icon">🎵</span>
+              <audio controls src={url} />
+            </div>
+          )}
+        </div>
+      );
+    }
+
     if (!msg.media_url || mediaErrors[msg.id]) return null;
 
     if (msg.media_type === 'video') {
@@ -107,15 +133,24 @@ export default function MessagesList({
       {messages.map((msg) => {
         const isOwn = msg.sender_id === currentUserId;
         const isDeleted = !!msg.deleted_at;
+        const isPending = !!msg._pending;
+        const isFailed = !!msg._failed;
 
         const showSeen =
           !isDeleted &&
+          !isPending &&
+          !isFailed &&
           isOwn &&
           conversation &&
           msg.id === lastOwnMessageId &&
           msg[otherReadColumn];
 
-        const hasMedia = !isDeleted && msg.media_url && !mediaErrors[msg.id];
+        const hasMedia =
+          !isDeleted &&
+          (isPending
+            ? !!msg._attachment
+            : msg.media_url && !mediaErrors[msg.id]);
+
         const hasContent =
           !isDeleted &&
           typeof msg.content === 'string' &&
@@ -129,12 +164,12 @@ export default function MessagesList({
               </div>
             )}
 
-            <div
-              className={`message-wrapper ${isOwn ? 'own' : 'other'}`}
-            >
+            <div className={`message-wrapper ${isOwn ? 'own' : 'other'}`}>
               <div
                 className={`message ${isOwn ? 'own' : ''} ${
                   isDeleted ? 'message--deleted' : ''
+                } ${isPending ? 'message--pending' : ''} ${
+                  isFailed ? 'message--failed' : ''
                 }`}
               >
                 {isDeleted ? (
@@ -168,9 +203,22 @@ export default function MessagesList({
                     hour12: true,
                   })}
                   {showSeen && <span className="msg-seen"> · Seen</span>}
+
+                  {isPending && (
+                    <span className="msg-status msg-status--pending" title="Sending">
+                      {' '}· ⟳
+                    </span>
+                  )}
+
+                  {isFailed && (
+                    <span className="msg-status msg-status--failed" title="Failed to send">
+                      {' '}· ⚠
+                    </span>
+                  )}
                 </div>
 
-                {!isDeleted && hasContent && (
+                {/* Copy button — hide for pending/failed */}
+                {!isDeleted && !isPending && !isFailed && hasContent && (
                   <button
                     type="button"
                     className="message-copy-btn"
@@ -182,7 +230,8 @@ export default function MessagesList({
                   </button>
                 )}
 
-                {isOwn && !isDeleted && onDeleteMessage && (
+                {/* Delete — hide for pending/failed */}
+                {isOwn && !isDeleted && !isPending && !isFailed && onDeleteMessage && (
                   <button
                     type="button"
                     className="message-delete-btn"
@@ -192,6 +241,30 @@ export default function MessagesList({
                   >
                     ×
                   </button>
+                )}
+
+                {/* Retry + dismiss for failed messages */}
+                {isFailed && (
+                  <div className="message-failed-actions">
+                    <button
+                      type="button"
+                      className="message-retry-btn"
+                      onClick={() => onRetryMessage?.(msg.id)}
+                      title="Retry"
+                      aria-label="Retry sending"
+                    >
+                      ↻ Retry
+                    </button>
+                    <button
+                      type="button"
+                      className="message-dismiss-btn"
+                      onClick={() => onDismissMessage?.(msg.id)}
+                      title="Dismiss"
+                      aria-label="Dismiss failed message"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
