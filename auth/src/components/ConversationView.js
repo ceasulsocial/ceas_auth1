@@ -1,12 +1,17 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
-import { supabase } from '../supabaseClient';
+// src/components/ConversationView.js
+import { useRef } from 'react';
 import MessagesList from './MessagesList';
 import MessageInput from './MessageInput';
 import { useMessageSender } from '../hooks/useMessageSender';
+import { useConversationMessages } from '../hooks/useConversationMessages';
+import { useMessagePagination } from '../hooks/useMessagePagination';
+import { useMessageScroll } from '../hooks/useMessageScroll';
+import { useReadReceipts } from '../hooks/useReadReceipts';
+import { useUnreadReset } from '../hooks/useUnreadReset';
+import { useMessageNotifications } from '../hooks/useMessageNotifications';
+import { useFileDragDrop } from '../hooks/useFileDragDrop';
+import { useDeleteMessage } from '../hooks/useDeleteMessage';
 import './ConversationsList.css';
-
-const PAGE_SIZE = 50;
-const SCROLL_BUTTON_THRESHOLD = 300;
 
 export default function ConversationView({
   conversation,
@@ -16,7 +21,7 @@ export default function ConversationView({
   clearTypingFor,
   isOtherTyping,
 }) {
-  // primitive values, safe for effect deps
+  // ── Derived primitives (stable for effect deps) ──
   const conversationId = conversation?.id;
   const user1Id = conversation?.user1_id;
   const isUser1 = currentUserId === user1Id;
@@ -24,154 +29,127 @@ export default function ConversationView({
   const myReadColumn = isUser1 ? 'read_user1' : 'read_user2';
   const currentUnread = conversation?.[myUnreadColumn] || 0;
 
-  const [messages, setMessages] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingOlder, setLoadingOlder] = useState(false);
-  const [hasMoreOlder, setHasMoreOlder] = useState(true);
-  const [error, setError] = useState(null);
-
-  const [showScrollButton, setShowScrollButton] = useState(false);
-  const [unreadWhileScrolledUp, setUnreadWhileScrolledUp] = useState(0);
-  const [newMessageDividerId, setNewMessageDividerId] = useState(null);
-
-  const messagesEndRef = useRef(null);
+  // ── Refs shared between hooks ──
   const messagesListRef = useRef(null);
-  const markingReadRef = useRef(new Set());
-  const channelRef = useRef(null);
-  const scrollTimerRef = useRef(null);
-  const loadingOlderRef = useRef(false);
-  const scrollIntentRef = useRef('none');
-  const hasDoneInitialScrollRef = useRef(false);
-  const notificationsRequestedRef = useRef(false);
-
-  // Message input ref for exposing addFile method
+  const messagesEndRef = useRef(null);
   const messageInputRef = useRef(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const dragCounterRef = useRef(0);
 
-  const scheduleScroll = useCallback((force = false) => {
-    if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
-    scrollTimerRef.current = setTimeout(() => {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          if (scrollIntentRef.current === 'preserve') return;
+  // ── Notifications ──
+  const { notify, requestOnGesture } = useMessageNotifications({
+    currentUserId,
+  });
 
-          if (!force) {
-            const listEl = messagesListRef.current;
-            if (listEl) {
-              const distanceFromBottom =
-                listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight;
-              if (distanceFromBottom > 200) return;
-            }
-          }
+  // ── 1. Messages + realtime ──
+  //    onInsert → inform scroll + notify + clear typing
+  //    (These are wired up below, after the scroll hook exists.)
+  //
+  //    We use a ref-indirection for the INSERT callback because
+  //    the messages hook runs BEFORE the scroll hook in source order.
+  //    The messages hook manages its own internal ref, so this outer
+  //    ref-indirection just lets us forward to the scroll hook.
+  const insertForwardRef = useRef(null);
 
-          messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
-        });
-      });
-    }, 50);
-  }, []);
+  const {
+    messages,
+    setMessages,
+    loading,
+    error,
+    setError,
+    PAGE_SIZE,
+  } = useConversationMessages({
+    conversationId,
+    onInsert: (msg) => insertForwardRef.current?.(msg),
+    onUpdate: () => {},
+    onDelete: () => {},
+  });
 
-  // ── Drag-and-drop ──
-  const handleDragEnter = useCallback((e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!e.dataTransfer?.types?.includes('Files')) return;
-    dragCounterRef.current += 1;
-    if (dragCounterRef.current === 1) setIsDragging(true);
-  }, []);
+  // ── 2. Pagination ──
+  //    hasMoreOlder lives here so ConversationView owns it and can
+  //    reset it on conversation change.
+  const hasMoreOlderRef = useRef(true);
+  const setHasMoreOlder = (v) => {
+    hasMoreOlderRef.current = v;
+  };
 
-  const handleDragLeave = useCallback((e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    dragCounterRef.current -= 1;
-    if (dragCounterRef.current <= 0) {
-      dragCounterRef.current = 0;
-      setIsDragging(false);
-    }
-  }, []);
+  // We need beginPrepend/endPrepend from the scroll hook, but the
+  // pagination hook needs them too. So: declare pagination hook last,
+  // and pass scroll's prepend methods into it.
+  //
+  // But scroll also needs loadOlder for its scroll listener. Circular.
+  //
+  // Solution: use a ref for loadOlder that the scroll hook calls, and
+  // wire the ref after both hooks are created.
+  const loadOlderRef = useRef(null);
 
-  const handleDragOver = useCallback((e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.dataTransfer.dropEffect = 'copy';
-  }, []);
+  // ── 3. Scroll ──
+  const {
+    showScrollButton,
+    unreadWhileScrolledUp,
+    newMessageDividerId,
+    handleMediaLoad,
+    handleScroll,
+    handleScrollToBottom,
+    handleIncoming,
+    handleOwnSend,
+    beginPrepend,
+    endPrepend,
+  } = useMessageScroll({
+    messages,
+    conversationId,
+    messagesListRef,
+    messagesEndRef,
+    loadOlder: () => loadOlderRef.current?.(),
+    currentUserId,
+  });
 
-  const handleDrop = useCallback((e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    dragCounterRef.current = 0;
-    setIsDragging(false);
+  // Wire the insert forwarder now that handleIncoming exists.
+  insertForwardRef.current = (msg) => {
+    handleIncoming(msg);
+    notify(msg);
+    if (clearTypingFor) clearTypingFor(conversationId);
+  };
 
-    const file = e.dataTransfer?.files?.[0];
-    if (!file) return;
+  // ── 4. Pagination (now that scroll hook exists) ──
+  const { loadOlder, loadingOlder } = useMessagePagination({
+    conversationId,
+    messages,
+    setMessages,
+    hasMoreOlder: hasMoreOlderRef.current,
+    setHasMoreOlder,
+    messagesListRef,
+    onBeforePrepend: beginPrepend,
+    onAfterPrepend: endPrepend,
+    PAGE_SIZE,
+  });
 
-    let type = null;
-    if (file.type.startsWith('video/')) type = 'video';
-    else if (file.type.startsWith('audio/')) type = 'audio';
-    else return;
+  // Wire the ref the scroll hook uses.
+  loadOlderRef.current = loadOlder;
 
-    messageInputRef.current?.addFile(file, type);
-  }, []);
+  // ── 5. Read receipts ──
+  useReadReceipts({
+    conversationId,
+    currentUserId,
+    messages,
+    myReadColumn,
+  });
 
-  const handleMediaLoad = useCallback(() => {
-    if (scrollIntentRef.current === 'preserve') return;
-    const listEl = messagesListRef.current;
-    if (!listEl) return;
-    const distanceFromBottom =
-      listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight;
-    if (distanceFromBottom > 500) return;
-    scheduleScroll();
-  }, [scheduleScroll]);
+  // ── 6. Unread reset ──
+  useUnreadReset({
+    conversationId,
+    currentUnread,
+    myUnreadColumn,
+    messages,
+  });
 
-  // ── Browser notification ──
-  const maybeNotify = useCallback(
-    (message) => {
-      if (message.sender_id === currentUserId) return;
-      if (!document.hidden) return;
-      if (!('Notification' in window)) return;
-      if (Notification.permission !== 'granted') return;
+  // ── 7. Delete ──
+  const { deleteMessage } = useDeleteMessage({
+    conversationId,
+    currentUserId,
+    setMessages,
+    setError,
+  });
 
-      let body;
-      if (message.content && message.content.trim().length > 0) {
-        body =
-          message.content.length > 80
-            ? `${message.content.slice(0, 80)}…`
-            : message.content;
-      } else if (message.media_type === 'video') {
-        body = '📹 Sent a video';
-      } else if (message.media_type === 'audio') {
-        body = '🎵 Sent an audio file';
-      } else {
-        body = 'New message';
-      }
-
-      try {
-        const notification = new Notification('Ceasul Social', {
-          body,
-          icon: '/favicon.ico',
-          tag: `conversation-${message.conversation}`,
-          renotify: true,
-        });
-        notification.onclick = () => {
-          window.focus();
-          notification.close();
-        };
-      } catch (err) {
-        console.error('Notification error:', err);
-      }
-    },
-    [currentUserId]
-  );
-
-  useEffect(() => {
-    if (notificationsRequestedRef.current) return;
-    notificationsRequestedRef.current = true;
-    if (!('Notification' in window)) return;
-    if (Notification.permission !== 'default') return;
-    Notification.requestPermission().catch(() => {});
-  }, []);
-
-  // ── Send hook ──
+  // ── 8. Send ──
   const {
     send,
     cancel,
@@ -185,364 +163,27 @@ export default function ConversationView({
     conversationId,
     currentUserId,
     onMessageSent: (msg) => {
-      scrollIntentRef.current = 'none';
       setMessages((prev) =>
         prev.some((m) => m.id === msg.id) ? prev : [...prev, msg]
       );
       onMessageSentProp?.(msg);
-      hasDoneInitialScrollRef.current = true;
-      scheduleScroll(true);
-
-      if ('Notification' in window && Notification.permission === 'default') {
-        Notification.requestPermission().catch(() => {});
-      }
+      handleOwnSend();
+      requestOnGesture();
     },
   });
 
-  const handleDeleteMessage = useCallback(
-    async (message) => {
-      if (!message || !conversationId) return;
-      if (message.sender_id !== currentUserId) return;
+  // ── 9. Drag-and-drop ──
+  const { isDragging, onDragEnter, onDragLeave, onDragOver, onDrop } =
+    useFileDragDrop({
+      onFile: (file, type) => messageInputRef.current?.addFile(file, type),
+    });
 
-      const deletedAt = new Date().toISOString();
+  // ── 10. Typing forwarder ──
+  const sendTyping = () => {
+    if (notifyTyping && conversationId) notifyTyping(conversationId);
+  };
 
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === message.id
-            ? { ...m, deleted_at: deletedAt, deleted_by: currentUserId }
-            : m
-        )
-      );
-
-      const { error: deleteError } = await supabase
-        .from('messages')
-        .update({ deleted_at: deletedAt, deleted_by: currentUserId })
-        .eq('id', message.id);
-
-      if (deleteError) {
-        console.error('Error deleting message:', deleteError);
-        setError(`Failed to delete message: ${deleteError.message}`);
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === message.id
-              ? { ...m, deleted_at: null, deleted_by: null }
-              : m
-          )
-        );
-      }
-    },
-    [conversationId, currentUserId]
-  );
-
-  const sendTyping = useCallback(() => {
-    if (notifyTyping && conversationId) {
-      notifyTyping(conversationId);
-    }
-  }, [notifyTyping, conversationId]);
-
-  const fetchInitialMessages = useCallback(async () => {
-    if (!conversationId) return;
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      const { data, error: fetchError } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('conversation', conversationId)
-        .order('created_at', { ascending: false })
-        .order('id', { ascending: false })
-        .limit(PAGE_SIZE);
-
-      if (fetchError) throw fetchError;
-
-      const sorted = (data || []).slice().reverse();
-      setMessages(sorted);
-      setHasMoreOlder((data?.length || 0) === PAGE_SIZE);
-      hasDoneInitialScrollRef.current = false;
-    } catch (err) {
-      console.error('Error fetching messages:', err);
-      setError(`Failed to load messages: ${err.message}`);
-    } finally {
-      setLoading(false);
-    }
-  }, [conversationId]);
-
-  const loadOlder = useCallback(async () => {
-    if (!conversationId || loadingOlderRef.current || !hasMoreOlder) return;
-    if (messages.length === 0) return;
-
-    const listEl = messagesListRef.current;
-    if (!listEl) return;
-    if (listEl.scrollHeight <= listEl.clientHeight) return;
-
-    loadingOlderRef.current = true;
-    setLoadingOlder(true);
-
-    const previousScrollHeight = listEl.scrollHeight;
-    const previousScrollTop = listEl.scrollTop;
-    const oldest = messages[0];
-
-    const finishLoadingOlder = () => {
-      loadingOlderRef.current = false;
-      setLoadingOlder(false);
-    };
-
-    try {
-      const { data, error: fetchError } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('conversation', conversationId)
-        .or(
-          `created_at.lt.${oldest.created_at},` +
-            `and(created_at.eq.${oldest.created_at},id.lt.${oldest.id})`
-        )
-        .order('created_at', { ascending: false })
-        .order('id', { ascending: false })
-        .limit(PAGE_SIZE);
-
-      if (fetchError) throw fetchError;
-
-      const older = (data || []).slice().reverse();
-
-      if (older.length < PAGE_SIZE) {
-        setHasMoreOlder(false);
-      }
-
-      if (older.length > 0) {
-        scrollIntentRef.current = 'preserve';
-
-        setMessages((prev) => {
-          const existing = new Set(prev.map((m) => m.id));
-          const filtered = older.filter((m) => !existing.has(m.id));
-          return [...filtered, ...prev];
-        });
-
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            if (listEl) {
-              const newScrollHeight = listEl.scrollHeight;
-              const delta = newScrollHeight - previousScrollHeight;
-              listEl.scrollTop = previousScrollTop + delta;
-            }
-            finishLoadingOlder();
-
-            setTimeout(() => {
-              if (scrollIntentRef.current === 'preserve') {
-                scrollIntentRef.current = 'none';
-              }
-            }, 500);
-          });
-        });
-      } else {
-        finishLoadingOlder();
-      }
-    } catch (err) {
-      console.error('Error loading older messages:', err);
-      setError(`Failed to load older messages: ${err.message}`);
-      finishLoadingOlder();
-    }
-  }, [conversationId, messages, hasMoreOlder]);
-
-  const handleScroll = useCallback(() => {
-    const listEl = messagesListRef.current;
-    if (!listEl) return;
-
-    if (scrollIntentRef.current === 'preserve') return;
-
-    if (listEl.scrollTop < 200) {
-      loadOlder();
-    }
-
-    const distanceFromBottom =
-      listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight;
-    const isFarFromBottom = distanceFromBottom > SCROLL_BUTTON_THRESHOLD;
-    setShowScrollButton(isFarFromBottom);
-
-    if (!isFarFromBottom) {
-      setUnreadWhileScrolledUp(0);
-      setNewMessageDividerId((prev) => (prev ? null : prev));
-    }
-  }, [loadOlder]);
-
-  const handleScrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    setUnreadWhileScrolledUp(0);
-    setShowScrollButton(false);
-    setNewMessageDividerId(null);
-  }, []);
-
-  // reset on conversation change
-  useEffect(() => {
-    scrollIntentRef.current = 'none';
-    hasDoneInitialScrollRef.current = false;
-    setHasMoreOlder(true);
-    setUnreadWhileScrolledUp(0);
-    setShowScrollButton(false);
-    setNewMessageDividerId(null);
-    setMessages([]);
-    markingReadRef.current = new Set();
-  }, [conversationId]);
-
-  useEffect(() => {
-    if (!conversationId) return;
-
-    setLoading(true);
-    fetchInitialMessages();
-
-    if (channelRef.current) {
-      supabase.removeChannel(channelRef.current);
-    }
-
-    const channel = supabase
-      .channel('messages_' + conversationId)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `conversation=eq.${conversationId}`,
-        },
-        (payload) => {
-          scrollIntentRef.current = 'none';
-
-          setMessages((prev) =>
-            prev.some((m) => m.id === payload.new.id)
-              ? prev
-              : [...prev, payload.new]
-          );
-
-          if (clearTypingFor) clearTypingFor(conversationId);
-
-          maybeNotify(payload.new);
-
-          const listEl = messagesListRef.current;
-          const distanceFromBottom = listEl
-            ? listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight
-            : null;
-          const isNearBottom =
-            distanceFromBottom !== null
-              ? distanceFromBottom < SCROLL_BUTTON_THRESHOLD
-              : true;
-
-          if (!isNearBottom && payload.new.sender_id !== currentUserId) {
-            setUnreadWhileScrolledUp((n) => n + 1);
-            setNewMessageDividerId((prev) => prev ?? payload.new.id);
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'messages',
-          filter: `conversation=eq.${conversationId}`,
-        },
-        (payload) => {
-          setMessages((prev) =>
-            prev.map((m) => (m.id === payload.new.id ? payload.new : m))
-          );
-          markingReadRef.current.delete(payload.new.id);
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'messages',
-          filter: `conversation=eq.${conversationId}`,
-        },
-        (payload) => {
-          setMessages((prev) => prev.filter((m) => m.id !== payload.old.id));
-        }
-      )
-      .subscribe();
-
-    channelRef.current = channel;
-
-    return () => {
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
-      }
-      if (scrollTimerRef.current) {
-        clearTimeout(scrollTimerRef.current);
-      }
-    };
-  }, [
-    conversationId,
-    fetchInitialMessages,
-    scheduleScroll,
-    currentUserId,
-    clearTypingFor,
-    maybeNotify,
-  ]);
-
-  useEffect(() => {
-    if (messages.length === 0) return;
-    const listEl = messagesListRef.current;
-    if (!listEl) return;
-
-    if (scrollIntentRef.current === 'preserve') return;
-
-    if (!hasDoneInitialScrollRef.current) {
-      hasDoneInitialScrollRef.current = true;
-      scheduleScroll(true);
-      return;
-    }
-
-    const distanceFromBottom =
-      listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight;
-
-    if (distanceFromBottom < 200) {
-      scheduleScroll();
-    }
-  }, [messages, scheduleScroll]);
-
-  useEffect(() => {
-    if (!conversationId || messages.length === 0) return;
-
-    const unreadIds = messages
-      .filter(
-        (m) =>
-          m.sender_id !== currentUserId &&
-          !m[myReadColumn] &&
-          !markingReadRef.current.has(m.id)
-      )
-      .map((m) => m.id);
-
-    if (unreadIds.length === 0) return;
-
-    unreadIds.forEach((id) => markingReadRef.current.add(id));
-
-    supabase
-      .from('messages')
-      .update({ [myReadColumn]: true })
-      .in('id', unreadIds)
-      .then(({ error }) => {
-        if (error) {
-          console.error('Error marking messages read:', error);
-          unreadIds.forEach((id) => markingReadRef.current.delete(id));
-        }
-      });
-  }, [messages, conversationId, currentUserId, myReadColumn]);
-
-  useEffect(() => {
-    if (!conversationId || currentUnread === 0) return;
-
-    supabase
-      .from('conversations')
-      .update({ [myUnreadColumn]: 0 })
-      .eq('id', conversationId)
-      .then(({ error }) => {
-        if (error) console.error('Error resetting unread count:', error);
-      });
-  }, [conversationId, currentUnread, myUnreadColumn, messages]);
-
+  // ── Render ──
   if (!conversation) {
     return (
       <div className="no-conversation">
@@ -554,6 +195,8 @@ export default function ConversationView({
   if (loading) {
     return <div className="loading">Loading messages...</div>;
   }
+
+  const allMessages = [...messages, ...pendingMessages];
 
   return (
     <>
@@ -572,10 +215,10 @@ export default function ConversationView({
         className={`messages-list ${isDragging ? 'messages-list--dragging' : ''}`}
         ref={messagesListRef}
         onScroll={handleScroll}
-        onDragEnter={handleDragEnter}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
+        onDragEnter={onDragEnter}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
       >
         {isDragging && (
           <div className="drop-overlay">
@@ -593,21 +236,21 @@ export default function ConversationView({
           </div>
         )}
 
-        {!hasMoreOlder && messages.length > 0 && (
+        {!hasMoreOlderRef.current && messages.length > 0 && (
           <div className="messages-no-more">
             — Beginning of conversation —
           </div>
         )}
 
-        {messages.length === 0 && pendingMessages.length === 0 ? (
+        {allMessages.length === 0 ? (
           <div className="no-messages">No messages yet. Say hello.</div>
         ) : (
           <MessagesList
-            messages={[...messages, ...pendingMessages]}
+            messages={allMessages}
             currentUserId={currentUserId}
             conversation={conversation}
             onMediaLoad={handleMediaLoad}
-            onDeleteMessage={handleDeleteMessage}
+            onDeleteMessage={deleteMessage}
             onRetryMessage={retryMessage}
             onDismissMessage={dismissMessage}
             newMessageDividerId={newMessageDividerId}
