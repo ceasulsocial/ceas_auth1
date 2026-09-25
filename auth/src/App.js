@@ -7,6 +7,8 @@ import { Home } from './components/Home';
 import { LoadingScreen } from './components/LoadingScreen';
 import ConversationsList from './components/ConversationsList';
 import './App.css';
+import TrainerApplication from './components/TrainerApplication';
+import AdminApplications from './components/AdminApplications';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -27,9 +29,24 @@ function AppContent() {
   const { user, profile, loading } = useAuth();
   const location = useLocation();
 
-  // The chat route uses its own wide layout (app-container--wide /
-  // app-content--chat) instead of the narrower auth/home container.
   const isChatRoute = location.pathname.startsWith('/conversations');
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  // const isApplyTrainerRoute = location.pathname.startsWith('/apply-trainer');
+
+  const isWideRoute = isChatRoute || isAdminRoute 
+
+  // ✅ use this instead of inline ternaries
+  const containerClass = isAdminRoute
+    ? 'app-container app-container--wide'
+    : isWideRoute
+    ? 'app-container app-container--wide'
+    : 'app-container';
+
+  const contentClass = isWideRoute
+    ? 'app-content app-content--chat'
+    : 'app-content';
+
+  const appClass = isWideRoute ? 'app app--chat' : 'app';
 
   if (loading) {
     return (
@@ -50,16 +67,32 @@ function AppContent() {
   }
 
   return (
-    <div className={isChatRoute ? 'app app--chat' : 'app'}>
-      <div className={isChatRoute ? 'app-container app-container--wide' : 'app-container'}>
-        {!isChatRoute && (
+    <div className={appClass}>
+      <div className={containerClass}>
+        {!isWideRoute && (
           <div className="app-header">
             <h1>Ceasul Social</h1>
           </div>
         )}
-        <div className={isChatRoute ? 'app-content app-content--chat' : 'app-content'}>
+        <div className={contentClass}>
           <div className="route-container">
             <Routes>
+              <Route
+                path="/apply-trainer"
+                element={
+                  <ProtectedRoute>
+                    <TrainerApplication />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/applications"
+                element={
+                  <ProtectedRoute>
+                    <AdminApplications />
+                  </ProtectedRoute>
+                }
+              />
               <Route path="/login" element={!user ? <Auth /> : <Navigate to="/" replace />} />
               <Route path="/role" element={<RoleSelectionRoute />} />
               <Route

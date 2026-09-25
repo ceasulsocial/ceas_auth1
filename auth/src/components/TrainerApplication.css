@@ -1,0 +1,222 @@
+/* src/components/TrainerApplication.css */
+
+.trainer-application {
+  display: flex;
+  justify-content: center;
+  padding: 40px 20px;
+  min-height: 100%;
+}
+
+.trainer-application-card {
+  width: 100%;
+  max-width: 640px;
+  background: #1e1f22;
+  border: 1px solid #2b2d31;
+  border-radius: 16px;
+  padding: 32px;
+  color: #fff;
+}
+
+.trainer-application-card h2 {
+  margin: 0 0 8px 0;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.trainer-application-subtitle {
+  margin: 0 0 24px 0;
+  color: #b9bbbe;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.trainer-application-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Fields */
+.ta-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ta-field label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.ta-hint {
+  color: #72767d;
+  font-weight: 400;
+  font-size: 12px;
+}
+
+.ta-field input[type='text'],
+.ta-field textarea {
+  background: #2c2f33;
+  border: 1px solid #40444b;
+  border-radius: 8px;
+  padding: 12px 14px;
+  color: #fff;
+  font-size: 15px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+  resize: vertical;
+}
+
+.ta-field input[type='text']:focus,
+.ta-field textarea:focus {
+  border-color: #00bcd4;
+}
+
+.ta-charcount {
+  font-size: 11px;
+  color: #72767d;
+  text-align: right;
+}
+
+/* Dropzone */
+.ta-dropzone {
+  border: 2px dashed #40444b;
+  border-radius: 12px;
+  padding: 32px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  background: #2c2f33;
+}
+
+.ta-dropzone:hover,
+.ta-dropzone--over {
+  border-color: #00bcd4;
+  background: rgba(0, 188, 212, 0.05);
+}
+
+.ta-dropzone-icon {
+  font-size: 36px;
+  margin-bottom: 8px;
+}
+
+.ta-dropzone-text {
+  color: #b9bbbe;
+  font-size: 14px;
+}
+
+/* File list */
+.ta-file-list {
+  list-style: none;
+  margin: 8px 0 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ta-file {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: #2c2f33;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.ta-file-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #dcddde;
+}
+
+.ta-file-size {
+  color: #72767d;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.ta-file-remove {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(237, 66, 69, 0.15);
+  color: #ed4245;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 0;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.ta-file-remove:hover {
+  background: #ed4245;
+  color: #fff;
+}
+
+/* Error */
+.ta-error {
+  color: #ed4245;
+  font-size: 13px;
+  padding: 10px 14px;
+  background: rgba(237, 66, 69, 0.1);
+  border-radius: 8px;
+}
+
+/* Actions */
+.ta-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.ta-cancel,
+.ta-submit {
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s;
+  min-width: 0;
+}
+
+.ta-cancel {
+  background: transparent;
+  color: #b9bbbe;
+  border: 1px solid #40444b;
+}
+
+.ta-cancel:hover:not(:disabled) {
+  background: #2c2f33;
+  color: #fff;
+}
+
+.ta-submit {
+  background: #00bcd4;
+  color: #181a1b;
+}
+
+.ta-submit:hover:not(:disabled) {
+  background: #0097a7;
+  color: #fff;
+}
+
+.ta-submit:disabled,
+.ta-cancel:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

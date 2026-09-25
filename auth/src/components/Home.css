@@ -1,0 +1,23 @@
+.home-app-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: #2c2f33;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+
+.app-status {
+  font-weight: 600;
+}
+
+.app-status--pending { color: #ffc107; }
+.app-status--approved { color: #43b581; }
+.app-status--rejected { color: #ed4245; }
+
+.app-status-date {
+  color: #72767d;
+  font-size: 12px;
+}
