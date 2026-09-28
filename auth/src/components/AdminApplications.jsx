@@ -9,9 +9,9 @@ export default function AdminApplications() {
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [filter, setFilter] = useState('pending'); // 'pending' | 'approved' | 'rejected' | 'all'
+  const [filter, setFilter] = useState('pending');
   const [selected, setSelected] = useState(null);
-  const [signedUrls, setSignedUrls] = useState({});   // { [path]: url }
+  const [signedUrls, setSignedUrls] = useState({});
   const [actionLoading, setActionLoading] = useState(null);
   const [reviewNote, setReviewNote] = useState('');
 
@@ -44,7 +44,7 @@ export default function AdminApplications() {
     fetchApplications();
   }, [fetchApplications, profile?.is_admin]);
 
-  // ── Sign URLs when an application is selected ──
+  // ── Sign URLs for credentials ──
   useEffect(() => {
     if (!selected) return;
 
@@ -57,7 +57,7 @@ export default function AdminApplications() {
         }
         const { data, error } = await supabase.storage
           .from('trainer-credentials')
-          .createSignedUrl(cred.path, 60 * 60); // 1 hour
+          .createSignedUrl(cred.path, 60 * 60);
         if (!error && data) {
           map[cred.path] = data.signedUrl;
         }
@@ -71,11 +71,19 @@ export default function AdminApplications() {
 
   // ── Approve ──
   const handleApprove = async () => {
+    console.log('🟢 [approve] started');
     if (!selected) return;
     setActionLoading('approve');
+    setError(null);
+
+    const applicationId = selected.id;
+    const applicantUserId = selected.user_id;
+    console.log('🟢 [approve] IDs captured:', { applicationId, applicantUserId });
+
     try {
       // 1. Update application
-      const { error: updateError } = await supabase
+      console.log('🟢 [approve] updating application…');
+      const { data: appData, error: updateError } = await supabase
         .from('trainer_applications')
         .update({
           status: 'approved',
@@ -84,23 +92,63 @@ export default function AdminApplications() {
           reviewer_notes: reviewNote.trim() || null,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', selected.id);
+        .eq('id', applicationId)
+        .select();
+
+      console.log('🟢 [approve] application update result:', {
+        rows: appData?.length,
+        error: updateError,
+      });
 
       if (updateError) throw updateError;
+      if (!appData || appData.length === 0) {
+        throw new Error('Application update affected 0 rows.');
+      }
 
       // 2. Update the user's role
-      const { error: roleError } = await supabase
+      console.log('🟢 [approve] updating role…');
+      const { data: profileData, error: roleError } = await supabase
         .from('profiles')
         .update({ role: 'trainer' })
-        .eq('id', selected.user_id);
+        .eq('id', applicantUserId)
+        .select();
+
+      console.log('🟢 [approve] role update result:', {
+        rows: profileData?.length,
+        error: roleError,
+      });
 
       if (roleError) throw roleError;
+      if (!profileData || profileData.length === 0) {
+        throw new Error('Role update blocked.');
+      }
 
+      // 3. Send the email (non-blocking; failure doesn't fail the flow)
+      console.log('🟢 [approve] invoking email function…');
+      try {
+        const { data, error: emailError } = await supabase.functions.invoke(
+          'send-email-application',
+          {
+            body: {
+              applicationId,
+              decision: 'approved',
+              notes: null,
+            },
+          }
+        );
+        console.log('🟢 [approve] email result:', { data, emailError });
+        if (emailError) console.error('Approval email failed:', emailError);
+      } catch (emailErr) {
+        console.error('Approval email exception:', emailErr);
+      }
+
+      // 4. Clear selection and refresh
+      console.log('🟢 [approve] success — clearing selection');
       setSelected(null);
       setReviewNote('');
       await fetchApplications();
     } catch (err) {
-      console.error(err);
+      console.error('🟢 [approve] FAILED:', err);
       setError(err.message);
     } finally {
       setActionLoading(null);
@@ -109,34 +157,71 @@ export default function AdminApplications() {
 
   // ── Decline ──
   const handleDecline = async () => {
+    console.log('🔴 [decline] started');
     if (!selected) return;
     setActionLoading('decline');
+    setError(null);
+
+    const applicationId = selected.id;
+    const notes = reviewNote.trim() || null;
+    console.log('🔴 [decline] IDs captured:', { applicationId });
+
     try {
-      const { error: updateError } = await supabase
+      // 1. Update application
+      console.log('🔴 [decline] updating application…');
+      const { data: appData, error: updateError } = await supabase
         .from('trainer_applications')
         .update({
           status: 'rejected',
           reviewed_by: user.id,
           reviewed_at: new Date().toISOString(),
-          reviewer_notes: reviewNote.trim() || null,
+          reviewer_notes: notes,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', selected.id);
+        .eq('id', applicationId)
+        .select();
+
+      console.log('🔴 [decline] application update result:', {
+        rows: appData?.length,
+        error: updateError,
+      });
 
       if (updateError) throw updateError;
+      if (!appData || appData.length === 0) {
+        throw new Error('Application update affected 0 rows.');
+      }
 
+      // 2. Send the email (non-blocking)
+      console.log('🔴 [decline] invoking email function…');
+      try {
+        const { data, error: emailError } = await supabase.functions.invoke(
+          'send-email-application',
+          {
+            body: {
+              applicationId,
+              decision: 'rejected',
+              notes,
+            },
+          }
+        );
+        console.log('🔴 [decline] email result:', { data, emailError });
+        if (emailError) console.error('Rejection email failed:', emailError);
+      } catch (emailErr) {
+        console.error('Rejection email exception:', emailErr);
+      }
+
+      console.log('🔴 [decline] success — clearing selection');
       setSelected(null);
       setReviewNote('');
       await fetchApplications();
     } catch (err) {
-      console.error(err);
+      console.error('🔴 [decline] FAILED:', err);
       setError(err.message);
     } finally {
       setActionLoading(null);
     }
   };
 
-  // ── Guard ──
   if (!profile?.is_admin) {
     return (
       <div className="admin-guard">
@@ -170,7 +255,6 @@ export default function AdminApplications() {
         <div className="aa-empty">No {filter} applications.</div>
       ) : (
         <div className="aa-layout">
-          {/* List */}
           <div className="aa-list">
             {applications.map((app) => (
               <button
@@ -200,7 +284,6 @@ export default function AdminApplications() {
             ))}
           </div>
 
-          {/* Detail */}
           <div className="aa-detail">
             {!selected ? (
               <div className="aa-empty-detail">
